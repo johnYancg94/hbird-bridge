@@ -1,0 +1,395 @@
+/* Hbird Bridge - 样式 */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: "Microsoft YaHei", "Segoe UI", Arial, sans-serif;
+    font-size: 12px;
+    background-color: #2d2d2d;
+    color: #e0e0e0;
+    overflow: hidden;
+}
+
+.container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    padding: 8px;
+}
+
+/* 工具栏 */
+.toolbar {
+    flex-shrink: 0;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #444;
+}
+
+.toolbar-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+}
+
+.toolbar-row:last-child {
+    margin-bottom: 0;
+}
+
+.label {
+    font-size: 11px;
+    color: #aaa;
+    white-space: nowrap;
+}
+
+.dir-input {
+    flex: 1;
+    padding: 4px 8px;
+    background: #1a1a1a;
+    border: 1px solid #444;
+    border-radius: 3px;
+    color: #ccc;
+    font-size: 11px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* 按钮 */
+.btn {
+    padding: 6px 12px;
+    background: #3a3a3a;
+    border: 1px solid #555;
+    border-radius: 4px;
+    color: #e0e0e0;
+    cursor: pointer;
+    font-size: 11px;
+    transition: all 0.2s;
+}
+
+.btn:hover {
+    background: #4a4a4a;
+    border-color: #666;
+}
+
+.btn:active {
+    background: #333;
+}
+
+.btn:disabled {
+    opacity: 0.48;
+    cursor: default;
+}
+
+.btn-small {
+    padding: 4px 8px;
+}
+
+.btn-icon {
+    flex: 0 0 30px;
+    width: 30px;
+    padding: 4px 0;
+    text-align: center;
+}
+
+.btn-archive {
+    min-width: 104px;
+    background: #4a4130;
+    border-color: #75623b;
+    color: #f2dfb0;
+}
+
+.btn-archive:hover {
+    background: #5a4d35;
+    border-color: #94794a;
+}
+
+.btn-primary {
+    background: #0066cc;
+    border-color: #0077ee;
+}
+
+.btn-primary:hover {
+    background: #0077ee;
+}
+
+.btn-open {
+    background: #185f9d;
+    border-color: #2879bd;
+    color: #fff;
+}
+
+.btn-open:hover {
+    background: #2475b9;
+    border-color: #3990d2;
+}
+
+.btn-place {
+    background: #13746d;
+    border-color: #208f85;
+    color: #fff;
+}
+
+.btn-place:hover {
+    background: #1a8b81;
+    border-color: #2ba59a;
+}
+
+.btn-copy-selection {
+    background: #9a5b13;
+    border-color: #bd7723;
+    color: #fff4dc;
+}
+
+.btn-copy-selection:hover {
+    background: #b66c18;
+    border-color: #d78a30;
+}
+
+.btn-smart {
+    background: #68409a;
+    border-color: #8558b8;
+    color: #f4eaff;
+}
+
+.btn-smart:hover {
+    background: #7d4db5;
+    border-color: #9b6bca;
+}
+
+.btn-secondary {
+    background: #444;
+}
+
+.btn-danger {
+    background: #a33;
+    border-color: #c44;
+}
+
+.btn-danger:hover {
+    background: #c44;
+}
+
+/* 自动刷新指示器 */
+.auto-refresh-indicator {
+    font-size: 10px;
+    color: #4CAF50;
+    margin-left: auto;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+/* 素材容器 */
+.assets-container {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 0;
+}
+
+/* 素材网格 */
+.assets-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 8px;
+}
+
+/* 空状态 */
+.empty-state {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 40px 20px;
+    color: #666;
+}
+
+.empty-state p {
+    margin-bottom: 8px;
+}
+
+.empty-state .hint {
+    font-size: 11px;
+    color: #555;
+}
+
+/* 素材卡片 */
+.asset-card {
+    position: relative;
+    background: #363636;
+    border: 2px solid transparent;
+    border-radius: 6px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.asset-card:hover {
+    background: #404040;
+    border-color: #555;
+}
+
+.asset-card.selected {
+    border-color: #0088ff;
+    box-shadow: 0 0 8px rgba(0, 136, 255, 0.3);
+}
+
+.asset-card .thumbnail {
+    width: 100%;
+    aspect-ratio: 1;
+    object-fit: cover;
+    background: #2a2a2a;
+    display: block;
+}
+
+.asset-card .thumbnail-placeholder {
+    width: 100%;
+    aspect-ratio: 1;
+    background: #2a2a2a;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    color: #555;
+}
+
+.asset-card .info {
+    padding: 6px;
+}
+
+.asset-card .name {
+    font-size: 10px;
+    color: #ccc;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.asset-card .meta {
+    font-size: 9px;
+    color: #777;
+    margin-top: 2px;
+}
+
+/* 选中复选框 */
+.asset-card .checkbox {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 18px;
+    height: 18px;
+    background: rgba(0, 0, 0, 0.5);
+    border: 2px solid #666;
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.asset-card:hover .checkbox,
+.asset-card.selected .checkbox {
+    opacity: 1;
+}
+
+.asset-card.selected .checkbox {
+    background: #0088ff;
+    border-color: #0088ff;
+}
+
+.asset-card.selected .checkbox::after {
+    content: "✓";
+    color: #fff;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+/* 已导入标记 */
+.asset-card .imported-badge {
+    position: absolute;
+    bottom: 50px;
+    left: 4px;
+    padding: 2px 6px;
+    background: rgba(76, 175, 80, 0.9);
+    border-radius: 3px;
+    font-size: 9px;
+    color: #fff;
+    font-weight: bold;
+}
+
+/* 底部操作栏 */
+.action-bar {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px 0;
+    border-top: 1px solid #444;
+}
+
+.selection-info {
+    font-size: 11px;
+    color: #888;
+}
+
+.hint-text {
+    font-size: 10px;
+    color: #666;
+    margin-left: 8px;
+}
+
+.action-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.action-button-row {
+    display: flex;
+    gap: 6px;
+    flex-wrap: nowrap;
+}
+
+.action-buttons .btn {
+    flex: 1 1 0;
+    min-width: 0;
+    padding-left: 4px;
+    padding-right: 4px;
+    white-space: nowrap;
+}
+
+.action-button-row-secondary .btn {
+    min-height: 32px;
+    font-weight: 600;
+}
+
+/* 状态栏 */
+.status-bar {
+    flex-shrink: 0;
+    padding: 4px 0;
+    font-size: 10px;
+    color: #666;
+    border-top: 1px solid #333;
+}
+
+/* 滚动条样式 */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #2a2a2a;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #555;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #666;
+}

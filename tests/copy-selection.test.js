@@ -1,0 +1,54 @@
+'use strict';
+
+const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
+
+const root = path.join(__dirname, '..');
+const index = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+const style = fs.readFileSync(path.join(root, 'css', 'style.css'), 'utf8');
+const main = fs.readFileSync(path.join(root, 'js', 'main.js'), 'utf8');
+
+const copyStart = main.indexOf('function copyCurrentSelection()');
+const copyEnd = main.indexOf('function importToPS(mode)', copyStart);
+const copyFunction = main.slice(copyStart, copyEnd);
+
+const firstRow = index.match(/<div class="action-button-row action-button-row-main">([\s\S]*?)<\/div>/);
+const secondRow = index.match(/<div class="action-button-row action-button-row-secondary">([\s\S]*?)<\/div>/);
+
+const checks = [
+    [copyStart >= 0 && copyEnd > copyStart, 'copyCurrentSelection must be a standalone controller action'],
+    [firstRow && firstRow[1].includes('id="deleteBtn"'), 'first row must contain delete'],
+    [firstRow && firstRow[1].includes('id="openNewBtn"'), 'first row must contain open-new'],
+    [firstRow && firstRow[1].includes('id="placeLayerBtn"'), 'first row must contain normal layer import'],
+    [secondRow && secondRow[1].includes('id="copySelectionBtn"'), 'second row must contain copy-selection'],
+    [secondRow && secondRow[1].includes('id="smartObjectBtn"'), 'second row must contain smart-object import'],
+    [index.includes('class="btn btn-open"'), 'open-new must have a distinct color class'],
+    [index.includes('class="btn btn-place"'), 'normal layer import must have a distinct color class'],
+    [index.includes('class="btn btn-copy-selection"'), 'copy-selection must have a distinct color class'],
+    [index.includes('class="btn btn-smart"'), 'smart-object import must have a distinct color class'],
+    [/\.action-buttons\s*\{[^}]*flex-direction:\s*column/s.test(style), 'action buttons must use a two-row column layout'],
+    [/\.action-button-row\s*\{[^}]*display:\s*flex/s.test(style), 'each action row must remain horizontal'],
+    [style.includes('.btn-open') && style.includes('.btn-place'), 'top-row action colors must exist'],
+    [style.includes('.btn-copy-selection') && style.includes('.btn-smart'), 'lower-row action colors must exist'],
+    [main.includes("elements.copySelectionBtn.addEventListener('click', copyCurrentSelection)"), 'button must bind to copyCurrentSelection'],
+    [copyFunction.includes('app.documents.length === 0'), 'action must reject missing documents'],
+    [copyFunction.includes('doc.selection.bounds'), 'action must verify an active selection'],
+    [copyFunction.includes('mergeDescriptor.putBoolean(charIDToTypeID("Dplc"), true)'), 'merge-visible must duplicate into a temporary stamp'],
+    [copyFunction.includes('executeAction(charIDToTypeID("MrgV"), mergeDescriptor, DialogModes.NO)'), 'action must stamp visible layers'],
+    [!copyFunction.includes('mergeVisibleLayers()'), 'action must not destructively merge the document'],
+    [copyFunction.includes('stringIDToTypeID("copyToLayer")'), 'selection must be copied into a new layer'],
+    [copyFunction.includes('selectionLayer.name = "选区拷贝"'), 'new layer must have a recognizable name'],
+    [copyFunction.includes('doc.selection.copy()'), 'new selection layer must be copied to the clipboard'],
+    [copyFunction.includes('stampLayer.remove()'), 'temporary stamp layer must be deleted after success'],
+    [copyFunction.includes('doc.activeLayer = selectionLayer'), 'new selection layer must remain active'],
+    [copyFunction.includes('doc.activeHistoryState = originalHistoryState'), 'failures must roll back document changes'],
+    [copyFunction.includes('当前没有有效的框选选区'), 'missing selections must return a clear message'],
+    [copyFunction.includes('选区已生成新图层并拷贝到剪贴板'), 'success status must explain both outcomes']
+];
+
+for (const [condition, message] of checks) {
+    assert(condition, message);
+}
+
+console.log(`copy-selection: ${checks.length} assertions passed`);

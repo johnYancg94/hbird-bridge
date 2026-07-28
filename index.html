@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Hbird Bridge</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- 顶部工具栏 -->
+        <div class="toolbar">
+            <div class="toolbar-row">
+                <span class="label">素材目录:</span>
+                <input type="text" id="assetsDir" class="dir-input" readonly>
+                <button id="browseDirBtn" class="btn btn-small">...</button>
+                <button id="openAssetsDirBtn" class="btn btn-small btn-icon" title="打开当前素材目录" aria-label="打开当前素材目录">📂</button>
+            </div>
+            <div class="toolbar-row">
+                <button id="scanFolderBtn" class="btn">📂 扫描文件夹</button>
+                <button id="archiveBtn" class="btn btn-archive">📦 一键归档</button>
+                <span id="autoRefreshIndicator" class="auto-refresh-indicator">● 自动监听中</span>
+            </div>
+        </div>
+
+        <!-- 素材网格 -->
+        <div class="assets-container">
+            <div id="assetsGrid" class="assets-grid">
+                <div class="empty-state" id="emptyState">
+                    <p>暂无图片</p>
+                    <p class="hint">点击「扫描文件夹」或放入图片</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 底部操作栏 -->
+        <div class="action-bar">
+            <div class="selection-info">
+                <span id="selectionCount">已选择 0 个</span>
+                <span class="hint-text">（Shift+点击 范围多选）</span>
+            </div>
+            <div class="action-buttons">
+                <div class="action-button-row action-button-row-main">
+                    <button id="deleteBtn" class="btn btn-danger">🗑️ 删除</button>
+                    <button id="openNewBtn" class="btn btn-open">新建文档打开</button>
+                    <button id="placeLayerBtn" class="btn btn-place">作为图层导入</button>
+                </div>
+                <div class="action-button-row action-button-row-secondary">
+                    <button id="copySelectionBtn" class="btn btn-copy-selection" title="将当前框选区域复制为新图层并写入剪贴板">拷贝当前选区</button>
+                    <button id="smartObjectBtn" class="btn btn-smart" title="替换当前图层并保持原位置">智能对象导入</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 状态栏 -->
+        <div class="status-bar">
+            <span id="statusText">就绪</span>
+        </div>
+    </div>
+
+    <script src="js/CSInterface.js"></script>
+    <script src="js/asset-utils.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>

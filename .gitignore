@@ -1,0 +1,19 @@
+# Historical local backups
+*.bak
+*.bak-*
+*.bak.*
+
+# Local runtime data
+*_settings.json
+node_modules/
+
+# Editor and operating-system files
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.tmp
+*.log
+
+# Local backup/export directories
+feature-backups/
+rebrand-backups/
