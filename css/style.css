@@ -1,5 +1,17 @@
 /* Hbird Bridge - 样式 */
 
+:root {
+    --panel-bg: #292a2d;
+    --panel-surface: #34363a;
+    --panel-surface-raised: #3c3f44;
+    --panel-border: #4c4f55;
+    --panel-text: #eceef1;
+    --panel-muted: #9da1a8;
+    --panel-accent: #d9902f;
+    --panel-accent-soft: rgba(217, 144, 47, 0.16);
+    --panel-focus: #f0a94d;
+}
+
 * {
     margin: 0;
     padding: 0;
@@ -7,10 +19,10 @@
 }
 
 body {
-    font-family: "Microsoft YaHei", "Segoe UI", Arial, sans-serif;
+    font-family: "Adobe Clean", "Microsoft YaHei UI", "Segoe UI", sans-serif;
     font-size: 12px;
-    background-color: #2d2d2d;
-    color: #e0e0e0;
+    background-color: var(--panel-bg);
+    color: var(--panel-text);
     overflow: hidden;
 }
 
@@ -24,7 +36,7 @@ body {
 /* 工具栏 */
 .toolbar {
     flex-shrink: 0;
-    padding-bottom: 8px;
+    padding: 2px 0 8px;
     border-bottom: 1px solid #444;
 }
 
@@ -39,22 +51,15 @@ body {
     margin-bottom: 0;
 }
 
-.label {
-    font-size: 11px;
-    color: #aaa;
-    white-space: nowrap;
+.toolbar-row-main {
+    min-height: 34px;
+    margin-bottom: 0;
 }
 
-.dir-input {
-    flex: 1;
-    padding: 4px 8px;
-    background: #1a1a1a;
-    border: 1px solid #444;
-    border-radius: 3px;
-    color: #ccc;
-    font-size: 11px;
-    overflow: hidden;
-    text-overflow: ellipsis;
+.toolbar-row-main #openFolderBtn,
+.toolbar-row-main #archiveBtn {
+    flex: 1 1 0;
+    min-width: 0;
 }
 
 /* 按钮 */
@@ -87,18 +92,49 @@ body {
     padding: 4px 8px;
 }
 
-.btn-icon {
-    flex: 0 0 30px;
-    width: 30px;
-    padding: 4px 0;
-    text-align: center;
-}
-
 .btn-archive {
     min-width: 104px;
     background: #4a4130;
     border-color: #75623b;
     color: #f2dfb0;
+}
+
+.btn-refresh {
+    flex: 0 0 34px;
+    width: 34px;
+    height: 32px;
+    padding: 0;
+    border-color: #526d79;
+    background: linear-gradient(180deg, #3d535d, #2f4149);
+    color: #8ed8ef;
+    font-size: 20px;
+    line-height: 30px;
+    box-shadow: inset 0 1px rgba(255, 255, 255, 0.05);
+}
+
+.btn-refresh:hover {
+    background: linear-gradient(180deg, #4b6874, #38515b);
+    border-color: #75c6df;
+    color: #d1f5ff;
+}
+
+.btn-settings {
+    flex: 0 0 34px;
+    width: 34px;
+    height: 32px;
+    padding: 0;
+    border-color: #62666d;
+    background: linear-gradient(180deg, #45484e, #34363a);
+    color: #f0b45f;
+    font-size: 17px;
+    line-height: 30px;
+    box-shadow: inset 0 1px rgba(255, 255, 255, 0.05);
+}
+
+.btn-settings:hover {
+    background: linear-gradient(180deg, #555960, #41444a);
+    border-color: #d18a31;
+    color: #ffd08b;
 }
 
 .btn-archive:hover {
@@ -176,7 +212,8 @@ body {
 .auto-refresh-indicator {
     font-size: 10px;
     color: #4CAF50;
-    margin-left: auto;
+    flex: 0 0 auto;
+    white-space: nowrap;
     animation: pulse 2s infinite;
 }
 
@@ -346,6 +383,233 @@ body {
     display: flex;
     flex-direction: column;
     gap: 6px;
+}
+
+/* 设置弹窗 */
+.settings-overlay {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px;
+    background: rgba(13, 14, 16, 0.76);
+    backdrop-filter: blur(3px);
+}
+
+.settings-overlay.is-hidden {
+    display: none;
+}
+
+.settings-dialog {
+    width: 100%;
+    max-width: 430px;
+    max-height: calc(100vh - 20px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.035), transparent 40%),
+        #303236;
+    border: 1px solid #5b5f66;
+    border-top: 2px solid var(--panel-accent);
+    border-radius: 8px;
+    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.52);
+}
+
+.settings-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 15px 16px 12px;
+    border-bottom: 1px solid #45484e;
+}
+
+.settings-eyebrow {
+    margin-bottom: 3px;
+    color: var(--panel-accent);
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 1.8px;
+}
+
+.settings-header h2 {
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+}
+
+.settings-close {
+    width: 28px;
+    height: 28px;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    background: transparent;
+    color: #aeb2b9;
+    cursor: pointer;
+    font-size: 21px;
+    line-height: 24px;
+}
+
+.settings-close:hover {
+    border-color: #60646b;
+    background: #41444a;
+    color: #fff;
+}
+
+.settings-content {
+    overflow-y: auto;
+    padding: 12px;
+}
+
+.settings-section {
+    padding: 13px;
+    background: #36383d;
+    border: 1px solid #484b51;
+    border-radius: 6px;
+}
+
+.settings-section + .settings-section {
+    margin-top: 10px;
+}
+
+.settings-section-accent {
+    border-color: #665339;
+    background:
+        linear-gradient(135deg, var(--panel-accent-soft), transparent 55%),
+        #36383d;
+}
+
+.settings-section-heading {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 11px;
+}
+
+.settings-section-index {
+    flex: 0 0 25px;
+    height: 20px;
+    color: var(--panel-accent);
+    font-family: Consolas, monospace;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 20px;
+    border-bottom: 1px solid #9a682c;
+}
+
+.settings-section h3 {
+    margin-bottom: 3px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.settings-section-heading p,
+.settings-field-hint {
+    color: var(--panel-muted);
+    font-size: 10px;
+    line-height: 1.45;
+}
+
+.settings-input {
+    width: 100%;
+    height: 32px;
+    padding: 5px 9px;
+    color: #f0f1f3;
+    background: #222428;
+    border: 1px solid #50535a;
+    border-radius: 4px;
+    outline: none;
+    font-size: 11px;
+}
+
+.settings-input:focus {
+    border-color: var(--panel-focus);
+    box-shadow: 0 0 0 2px rgba(240, 169, 77, 0.14);
+}
+
+.settings-path-input {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.settings-inline-actions {
+    display: flex;
+    gap: 7px;
+    margin-top: 8px;
+}
+
+.settings-inline-actions .btn {
+    flex: 1 1 0;
+}
+
+.settings-field-label {
+    display: block;
+    margin-bottom: 6px;
+    color: #c7cad0;
+    font-size: 10px;
+}
+
+.settings-number-field {
+    position: relative;
+}
+
+.settings-number-field .settings-input {
+    padding-right: 38px;
+    font-family: Consolas, monospace;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.settings-unit {
+    position: absolute;
+    top: 0;
+    right: 10px;
+    height: 32px;
+    color: #888d95;
+    font-family: Consolas, monospace;
+    font-size: 10px;
+    line-height: 32px;
+    pointer-events: none;
+}
+
+.settings-field-hint {
+    margin-top: 6px;
+}
+
+.settings-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 11px 13px;
+    background: #292b2f;
+    border-top: 1px solid #45484e;
+}
+
+.settings-footer .btn {
+    min-width: 82px;
+}
+
+@media (max-width: 350px) {
+    .auto-refresh-indicator {
+        width: 12px;
+        overflow: hidden;
+    }
+
+    .toolbar-row-main .btn {
+        padding-left: 6px;
+        padding-right: 6px;
+    }
+
+    .toolbar-row-main #openFolderBtn {
+        padding-left: 3px;
+        padding-right: 3px;
+        font-size: 9px;
+        white-space: nowrap;
+    }
 }
 
 .action-button-row {

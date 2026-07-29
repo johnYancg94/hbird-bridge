@@ -9,17 +9,73 @@
     <div class="container">
         <!-- 顶部工具栏 -->
         <div class="toolbar">
-            <div class="toolbar-row">
-                <span class="label">素材目录:</span>
-                <input type="text" id="assetsDir" class="dir-input" readonly>
-                <button id="browseDirBtn" class="btn btn-small">...</button>
-                <button id="openAssetsDirBtn" class="btn btn-small btn-icon" title="打开当前素材目录" aria-label="打开当前素材目录">📂</button>
-            </div>
-            <div class="toolbar-row">
-                <button id="scanFolderBtn" class="btn">📂 扫描文件夹</button>
+            <div class="toolbar-row toolbar-row-main">
+                <button id="openFolderBtn" class="btn">📂 打开当前文件夹</button>
                 <button id="archiveBtn" class="btn btn-archive">📦 一键归档</button>
                 <span id="autoRefreshIndicator" class="auto-refresh-indicator">● 自动监听中</span>
+                <button id="refreshBtn" class="btn btn-refresh" title="重新扫描素材" aria-label="重新扫描素材">↻</button>
+                <button id="settingsBtn" class="btn btn-settings" title="设置" aria-label="打开设置">⚙</button>
             </div>
+        </div>
+
+        <!-- 设置面板 -->
+        <div id="settingsOverlay" class="settings-overlay is-hidden" aria-hidden="true">
+            <section class="settings-dialog" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+                <header class="settings-header">
+                    <div>
+                        <p class="settings-eyebrow">HBIRD BRIDGE</p>
+                        <h2 id="settingsTitle">工作流设置</h2>
+                    </div>
+                    <button id="closeSettingsBtn" class="settings-close" title="关闭设置" aria-label="关闭设置">×</button>
+                </header>
+
+                <div class="settings-content">
+                    <div class="settings-section">
+                        <div class="settings-section-heading">
+                            <span class="settings-section-index">01</span>
+                            <div>
+                                <h3>素材目录</h3>
+                                <p>插件只扫描该目录根层中的图片。</p>
+                            </div>
+                        </div>
+                        <input type="text" id="settingsAssetsDir" class="settings-input settings-path-input" readonly>
+                        <div class="settings-inline-actions">
+                            <button id="settingsBrowseDirBtn" class="btn btn-secondary">选择目录</button>
+                            <button id="settingsOpenAssetsDirBtn" class="btn btn-secondary">打开目录</button>
+                        </div>
+                    </div>
+
+                    <div class="settings-section settings-section-accent">
+                        <div class="settings-section-heading">
+                            <span class="settings-section-index">02</span>
+                            <div>
+                                <h3>拷贝图片优化</h3>
+                                <p>超出最长边时，仅缩小临时导出副本，原图层保持原尺寸。</p>
+                            </div>
+                        </div>
+                        <label class="settings-field-label" for="settingsClipboardMaxEdge">最长边分辨率</label>
+                        <div class="settings-number-field">
+                            <input
+                                type="number"
+                                id="settingsClipboardMaxEdge"
+                                class="settings-input"
+                                min="256"
+                                max="16384"
+                                step="64"
+                                value="2560"
+                                inputmode="numeric"
+                            >
+                            <span class="settings-unit">px</span>
+                        </div>
+                        <p class="settings-field-hint">建议 2048–4096；默认 2560。</p>
+                    </div>
+                </div>
+
+                <footer class="settings-footer">
+                    <button id="cancelSettingsBtn" class="btn btn-secondary">取消</button>
+                    <button id="saveSettingsBtn" class="btn btn-primary">保存设置</button>
+                </footer>
+            </section>
         </div>
 
         <!-- 素材网格 -->
@@ -27,7 +83,7 @@
             <div id="assetsGrid" class="assets-grid">
                 <div class="empty-state" id="emptyState">
                     <p>暂无图片</p>
-                    <p class="hint">点击「扫描文件夹」或放入图片</p>
+                <p class="hint">点击右上角刷新图标或放入图片</p>
                 </div>
             </div>
         </div>
@@ -45,8 +101,8 @@
                     <button id="placeLayerBtn" class="btn btn-place">作为图层导入</button>
                 </div>
                 <div class="action-button-row action-button-row-secondary">
-                    <button id="copySelectionBtn" class="btn btn-copy-selection" title="将当前框选区域复制为新图层并写入剪贴板">拷贝当前选区</button>
-                    <button id="smartObjectBtn" class="btn btn-smart" title="替换当前图层并保持原位置">智能对象导入</button>
+                    <button id="copySelectionBtn" class="btn btn-copy-selection" title="将当前框选区域生成新图层，并按设置优化后写入系统剪贴板">拷贝当前选区</button>
+                    <button id="smartObjectBtn" class="btn btn-smart" title="替换当前图层并保持原位置，完成后自动栅格化">智能对象导入</button>
                 </div>
             </div>
         </div>

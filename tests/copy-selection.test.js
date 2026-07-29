@@ -9,9 +9,15 @@ const index = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const style = fs.readFileSync(path.join(root, 'css', 'style.css'), 'utf8');
 const main = fs.readFileSync(path.join(root, 'js', 'main.js'), 'utf8');
 
+const clipboardHelpersStart = main.indexOf('function writeImageFileToWindowsClipboard(');
 const copyStart = main.indexOf('function copyCurrentSelection()');
 const copyEnd = main.indexOf('function importToPS(mode)', copyStart);
+const clipboardHelpers = main.slice(clipboardHelpersStart, copyStart);
 const copyFunction = main.slice(copyStart, copyEnd);
+const createSelectionLayerPosition = copyFunction.indexOf('selectionLayer = doc.activeLayer');
+const removeTemporaryStampPosition = copyFunction.indexOf('stampLayer.remove()');
+const createExportDocumentPosition = copyFunction.indexOf('tempDocument = app.documents.add(');
+const saveClipboardPngPosition = copyFunction.indexOf('tempDocument.saveAs(exportFile, pngOptions, true, Extension.LOWERCASE)');
 
 const firstRow = index.match(/<div class="action-button-row action-button-row-main">([\s\S]*?)<\/div>/);
 const secondRow = index.match(/<div class="action-button-row action-button-row-secondary">([\s\S]*?)<\/div>/);
@@ -39,12 +45,50 @@ const checks = [
     [!copyFunction.includes('mergeVisibleLayers()'), 'action must not destructively merge the document'],
     [copyFunction.includes('stringIDToTypeID("copyToLayer")'), 'selection must be copied into a new layer'],
     [copyFunction.includes('selectionLayer.name = "选区拷贝"'), 'new layer must have a recognizable name'],
-    [copyFunction.includes('doc.selection.copy()'), 'new selection layer must be copied to the clipboard'],
+    [!copyFunction.includes('doc.selection.copy()'), 'clipboard copy must not use the unreliable Selection DOM method'],
+    [!copyFunction.includes('executeAction(charIDToTypeID("copy"), undefined, DialogModes.NO)'), 'clipboard copy must not stop at Photoshop internal Copy'],
+    [!copyFunction.includes('app.currentTool'), 'clipboard export must not change the user tool'],
+    [!clipboardHelpers.includes('SendKeys'), 'clipboard export must not depend on simulated keyboard focus'],
+    [!clipboardHelpers.includes('WScript.Shell'), 'clipboard export must not depend on CEP or canvas focus'],
+    [createSelectionLayerPosition >= 0 && createSelectionLayerPosition < removeTemporaryStampPosition, 'the selection layer must exist before removing the temporary stamp'],
+    [removeTemporaryStampPosition < createExportDocumentPosition, 'the retained selection layer must be finalized before creating a temporary export document'],
+    [copyFunction.includes('var clipboardMaxEdge = '), 'Photoshop export must receive the configured maximum edge'],
+    [copyFunction.includes('var tempDocument = null'), 'clipboard export must use an isolated temporary document'],
+    [
+        /selectionLayer\.duplicate\(\s*tempDocument,\s*ElementPlacement\.PLACEATBEGINNING\s*\)/.test(copyFunction),
+        'the retained layer must be duplicated instead of resized in place'
+    ],
+    [copyFunction.includes('var sourceLayerBounds = selectionLayer.bounds'), 'export must capture source content bounds'],
+    [copyFunction.includes('var exportLayerBounds = exportLayer.bounds'), 'export must measure the duplicated layer at its actual destination position'],
+    [copyFunction.includes('desiredContentLeft - exportLayerBounds[0].as("px")'), 'export positioning must preserve transparent padding inside the selection'],
+    [copyFunction.includes('if (longestEdge > clipboardMaxEdge)'), 'only oversized clipboard images should be optimized'],
+    [copyFunction.includes('stringIDToTypeID("newPlacedLayer")'), 'oversized temporary exports must be converted to a smart object'],
+    [copyFunction.includes('tempDocument.resizeImage('), 'oversized temporary exports must be resized before PNG export'],
+    [copyFunction.includes('tempDocument.resolution,'), 'clipboard resize must preserve document resolution'],
+    [copyFunction.includes('new PNGSaveOptions()'), 'clipboard transfer must use a transparent PNG intermediary'],
+    [saveClipboardPngPosition > createExportDocumentPosition, 'temporary PNG must be saved after the export document is prepared'],
+    [copyFunction.includes('tempDocument.close(SaveOptions.DONOTSAVECHANGES)'), 'temporary Photoshop document must always close without user changes'],
+    [copyFunction.includes('optimized: optimized'), 'Photoshop response must report whether resolution optimization occurred'],
+    [copyFunction.includes('outputWidth: outputWidth'), 'Photoshop response must report output dimensions'],
+    [copyFunction.includes('writeImageFileToWindowsClipboard(response.tempFilePath'), 'successful PNG export must trigger direct Windows clipboard writing'],
+    [clipboardHelpersStart >= 0 && clipboardHelpers.includes("childProcess.execFile('powershell.exe'"), 'Windows clipboard writing must use the existing CEP child-process bridge'],
+    [clipboardHelpers.includes("'-STA'"), 'the clipboard helper must run PowerShell in STA mode'],
+    [clipboardHelpers.includes('$env:HBIRD_CLIPBOARD_IMAGE'), 'image path must be passed without shell interpolation'],
+    [clipboardHelpers.includes('System.Drawing'), 'the helper must decode the exported image'],
+    [clipboardHelpers.includes('System.Windows.Forms.DataObject'), 'the helper must build a multi-format clipboard payload'],
+    [clipboardHelpers.includes('DataFormats]::Bitmap'), 'the clipboard payload must include Bitmap format'],
+    [clipboardHelpers.includes('$pngStream.Position = 0'), 'PNG clipboard stream must rewind after image decoding'],
+    [clipboardHelpers.includes('SetData("PNG"'), 'the clipboard payload must include PNG format'],
+    [clipboardHelpers.includes('Clipboard]::SetDataObject'), 'the helper must write directly to the Windows clipboard'],
+    [clipboardHelpers.includes('GetClipboardSequenceNumber'), 'the helper must detect whether Windows clipboard ownership changed'],
+    [clipboardHelpers.includes('Clipboard]::ContainsImage()'), 'the helper must verify a pasted image is available'],
+    [clipboardHelpers.includes('windowsHide: true'), 'the PowerShell helper must not flash a console window'],
+    [main.includes('fs.unlink(imagePath'), 'temporary PNG must be deleted after the clipboard attempt'],
     [copyFunction.includes('stampLayer.remove()'), 'temporary stamp layer must be deleted after success'],
     [copyFunction.includes('doc.activeLayer = selectionLayer'), 'new selection layer must remain active'],
     [copyFunction.includes('doc.activeHistoryState = originalHistoryState'), 'failures must roll back document changes'],
     [copyFunction.includes('当前没有有效的框选选区'), 'missing selections must return a clear message'],
-    [copyFunction.includes('选区已生成新图层并拷贝到剪贴板'), 'success status must explain both outcomes']
+    [copyFunction.includes('选区已生成新图层并拷贝到 Windows 剪贴板'), 'success status must confirm the external clipboard target']
 ];
 
 for (const [condition, message] of checks) {

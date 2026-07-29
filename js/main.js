@@ -1,6 +1,6 @@
 /**
  * Hbird Bridge - 主逻辑
- * 版本 1.5.0 - 新增选区拷贝、双行彩色操作区和智能对象无位移替换
+ * 版本 1.6.1 - 优化工具栏：目录打开主按钮与独立手动刷新入口
  */
 
 (function() {
@@ -9,6 +9,7 @@
     // ==================== 配置 ====================
     const CONFIG = {
         assetsDir: '',
+        clipboardMaxEdge: 2560,
         supportedImages: ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.tiff', '.tif', '.psd'],
         autoRefreshInterval: 5000,
         scanConcurrency: 16,
@@ -62,10 +63,17 @@
         CONFIG.assetsDir = path.join(homeDir, 'HbirdBridge');
 
         elements = {
-            assetsDir: document.getElementById('assetsDir'),
-            browseDirBtn: document.getElementById('browseDirBtn'),
-            openAssetsDirBtn: document.getElementById('openAssetsDirBtn'),
-            scanFolderBtn: document.getElementById('scanFolderBtn'),
+            settingsBtn: document.getElementById('settingsBtn'),
+            settingsOverlay: document.getElementById('settingsOverlay'),
+            closeSettingsBtn: document.getElementById('closeSettingsBtn'),
+            cancelSettingsBtn: document.getElementById('cancelSettingsBtn'),
+            saveSettingsBtn: document.getElementById('saveSettingsBtn'),
+            settingsAssetsDir: document.getElementById('settingsAssetsDir'),
+            settingsBrowseDirBtn: document.getElementById('settingsBrowseDirBtn'),
+            settingsOpenAssetsDirBtn: document.getElementById('settingsOpenAssetsDirBtn'),
+            settingsClipboardMaxEdge: document.getElementById('settingsClipboardMaxEdge'),
+            openFolderBtn: document.getElementById('openFolderBtn'),
+            refreshBtn: document.getElementById('refreshBtn'),
             archiveBtn: document.getElementById('archiveBtn'),
             assetsContainer: document.querySelector('.assets-container'),
             assetsGrid: document.getElementById('assetsGrid'),
@@ -79,12 +87,22 @@
             autoRefreshIndicator: document.getElementById('autoRefreshIndicator')
         };
 
-        elements.assetsDir.value = CONFIG.assetsDir;
-
         // 固定控件事件
-        elements.scanFolderBtn.addEventListener('click', scanFolder);
-        elements.browseDirBtn.addEventListener('click', browseDir);
-        elements.openAssetsDirBtn.addEventListener('click', openAssetsDirectory);
+        elements.openFolderBtn.addEventListener('click', () => openAssetsDirectory(CONFIG.assetsDir));
+        elements.refreshBtn.addEventListener('click', scanFolder);
+        elements.settingsBtn.addEventListener('click', openSettings);
+        elements.closeSettingsBtn.addEventListener('click', closeSettings);
+        elements.cancelSettingsBtn.addEventListener('click', closeSettings);
+        elements.saveSettingsBtn.addEventListener('click', applySettings);
+        elements.settingsBrowseDirBtn.addEventListener('click', browseDir);
+        elements.settingsOpenAssetsDirBtn.addEventListener('click', () => {
+            openAssetsDirectory(elements.settingsAssetsDir.value);
+        });
+        elements.settingsOverlay.addEventListener('click', event => {
+            if (event.target === elements.settingsOverlay) {
+                closeSettings();
+            }
+        });
         elements.archiveBtn.addEventListener('click', archiveOldImages);
         elements.deleteBtn.addEventListener('click', deleteSelectedAssets);
         elements.openNewBtn.addEventListener('click', () => importToPS('open'));
@@ -98,6 +116,7 @@
 
         setupThumbnailVisibility();
         loadSettings();
+        syncSettingsFields();
         loadAssets();
         startAutoRefresh();
     }
@@ -160,6 +179,8 @@
 
     const SETTINGS_FILENAME = 'HbirdBridge_settings.json';
     const LEGACY_SETTINGS_FILENAME = 'Qiaodoumayijiang_settings.json';
+    const MIN_CLIPBOARD_MAX_EDGE = 256;
+    const MAX_CLIPBOARD_MAX_EDGE = 16384;
 
     function getSettingsPath(fileName) {
         return path.join(os.homedir(), fileName);
@@ -178,12 +199,19 @@
                 const settings = JSON.parse(fs.readFileSync(candidate.path, 'utf8'));
                 if (settings.assetsDir && fs.existsSync(settings.assetsDir)) {
                     CONFIG.assetsDir = settings.assetsDir;
-                    elements.assetsDir.value = CONFIG.assetsDir;
+                }
+
+                const savedMaxEdge = Number(settings.clipboardMaxEdge);
+                if (Number.isFinite(savedMaxEdge)) {
+                    CONFIG.clipboardMaxEdge = normalizeClipboardMaxEdge(savedMaxEdge);
                 }
 
                 if (candidate.legacy) {
-                    saveSettings();
-                    console.log('已将旧版设置迁移到 Hbird Bridge');
+                    if (saveSettings()) {
+                        console.log('已将旧版设置迁移到 Hbird Bridge');
+                    } else {
+                        console.log('旧版设置已载入，但迁移文件写入失败');
+                    }
                 }
                 return;
             } catch(error) {
@@ -195,28 +223,110 @@
     function saveSettings() {
         try {
             const settingsPath = getSettingsPath(SETTINGS_FILENAME);
-            fs.writeFileSync(settingsPath, JSON.stringify({ assetsDir: CONFIG.assetsDir }), 'utf8');
+            fs.writeFileSync(settingsPath, JSON.stringify({
+                assetsDir: CONFIG.assetsDir,
+                clipboardMaxEdge: CONFIG.clipboardMaxEdge
+            }, null, 2), 'utf8');
+            return true;
         } catch(error) {
             console.log('保存设置失败:', error);
+            return false;
         }
     }
 
     // ==================== 目录选择 ====================
 
+    function normalizeClipboardMaxEdge(value) {
+        const rounded = Math.round(Number(value));
+        if (!Number.isFinite(rounded)) {
+            return CONFIG.clipboardMaxEdge;
+        }
+        return Math.max(MIN_CLIPBOARD_MAX_EDGE, Math.min(MAX_CLIPBOARD_MAX_EDGE, rounded));
+    }
+
+    function syncSettingsFields() {
+        if (!elements.settingsAssetsDir || !elements.settingsClipboardMaxEdge) return;
+        elements.settingsAssetsDir.value = CONFIG.assetsDir;
+        elements.settingsClipboardMaxEdge.value = String(CONFIG.clipboardMaxEdge);
+    }
+
+    function openSettings() {
+        syncSettingsFields();
+        elements.settingsOverlay.classList.remove('is-hidden');
+        elements.settingsOverlay.setAttribute('aria-hidden', 'false');
+        setTimeout(() => elements.settingsClipboardMaxEdge.focus(), 0);
+    }
+
+    function closeSettings() {
+        if (!elements.settingsOverlay) return;
+        elements.settingsOverlay.classList.add('is-hidden');
+        elements.settingsOverlay.setAttribute('aria-hidden', 'true');
+    }
+
+    function handleSettingsKeyDown(event) {
+        if (event.key === 'Escape' &&
+            elements.settingsOverlay &&
+            !elements.settingsOverlay.classList.contains('is-hidden')) {
+            closeSettings();
+        }
+    }
+
     function browseDir() {
-        const result = window.cep.fs.showOpenDialogEx(false, true, '选择素材目录', CONFIG.assetsDir, null);
+        const currentDirectory = elements.settingsAssetsDir.value || CONFIG.assetsDir;
+        const result = window.cep.fs.showOpenDialogEx(false, true, '选择素材目录', currentDirectory, null);
         if (result.data && result.data.length > 0) {
-            CONFIG.assetsDir = result.data[0];
-            elements.assetsDir.value = CONFIG.assetsDir;
-            saveSettings();
+            elements.settingsAssetsDir.value = result.data[0];
+        }
+    }
+
+    function applySettings() {
+        if (archiveInProgress) {
+            alert('正在归档图片，请等待归档完成后再保存设置');
+            setStatus('归档期间不能修改设置');
+            return;
+        }
+
+        const nextAssetsDir = path.win32.normalize(elements.settingsAssetsDir.value.trim());
+        const rawMaxEdge = Number(elements.settingsClipboardMaxEdge.value);
+
+        if (!nextAssetsDir || !fs.existsSync(nextAssetsDir)) {
+            alert('请选择有效的素材目录');
+            return;
+        }
+        if (!Number.isFinite(rawMaxEdge) ||
+            rawMaxEdge < MIN_CLIPBOARD_MAX_EDGE ||
+            rawMaxEdge > MAX_CLIPBOARD_MAX_EDGE) {
+            alert(`最长边分辨率请输入 ${MIN_CLIPBOARD_MAX_EDGE}–${MAX_CLIPBOARD_MAX_EDGE} 之间的数字`);
+            elements.settingsClipboardMaxEdge.focus();
+            return;
+        }
+
+        const assetsDirectoryChanged = path.win32.normalize(CONFIG.assetsDir) !== nextAssetsDir;
+        const previousAssetsDir = CONFIG.assetsDir;
+        const previousClipboardMaxEdge = CONFIG.clipboardMaxEdge;
+        CONFIG.assetsDir = nextAssetsDir;
+        CONFIG.clipboardMaxEdge = normalizeClipboardMaxEdge(rawMaxEdge);
+        if (!saveSettings()) {
+            CONFIG.assetsDir = previousAssetsDir;
+            CONFIG.clipboardMaxEdge = previousClipboardMaxEdge;
+            syncSettingsFields();
+            alert('设置保存失败，请检查文件权限或磁盘状态后重试');
+            setStatus('设置保存失败');
+            return;
+        }
+        syncSettingsFields();
+        closeSettings();
+
+        if (assetsDirectoryChanged) {
             lastSnapshot = '';
             loadAssets();
             startAutoRefresh();
         }
+        setStatus(`设置已保存 · 拷贝最长边 ${CONFIG.clipboardMaxEdge}px`);
     }
 
-    function openAssetsDirectory() {
-        const explorerDirectory = path.win32.normalize(CONFIG.assetsDir);
+    function openAssetsDirectory(directoryPath) {
+        const explorerDirectory = path.win32.normalize(directoryPath || CONFIG.assetsDir);
         if (!fs.existsSync(explorerDirectory)) {
             alert('当前素材目录不存在');
             setStatus('无法打开素材目录');
@@ -489,7 +599,7 @@
 
         const hint = document.createElement('p');
         hint.className = 'hint';
-        hint.textContent = '点击「扫描文件夹」或放入图片';
+            hint.textContent = '点击右上角刷新图标或放入图片';
 
         emptyState.appendChild(title);
         emptyState.appendChild(hint);
@@ -815,14 +925,15 @@
         setArchiveBusy(true);
         setStatus('正在计算归档计划...');
 
-        scanFolderInternal(CONFIG.assetsDir).then(assets => {
+        const archiveRoot = path.resolve(CONFIG.assetsDir);
+        scanFolderInternal(archiveRoot).then(assets => {
             const archivePlan = AssetUtils.buildArchivePlan(assets, CONFIG.archiveKeepCount);
             if (archivePlan.archive.length === 0) {
                 setStatus(`当前共 ${assets.length} 张图片，无需归档`);
                 return null;
             }
 
-            const movePlan = buildArchiveMovePlan(archivePlan.archive);
+            const movePlan = buildArchiveMovePlan(archivePlan.archive, archiveRoot);
             const confirmed = confirm(buildArchiveConfirmation(assets.length, archivePlan, movePlan));
             if (!confirmed) {
                 setStatus('已取消归档');
@@ -865,8 +976,8 @@
         });
     }
 
-    function buildArchiveMovePlan(archiveAssets) {
-        const rootPath = path.resolve(CONFIG.assetsDir);
+    function buildArchiveMovePlan(archiveAssets, archiveRoot) {
+        const rootPath = path.resolve(archiveRoot);
         const rootKey = rootPath.toLowerCase();
         const reservedNamesByDirectory = new Map();
 
@@ -955,8 +1066,11 @@
 
     function setArchiveBusy(busy) {
         const controls = [
-            elements.browseDirBtn,
-            elements.scanFolderBtn,
+            elements.settingsBtn,
+            elements.settingsBrowseDirBtn,
+            elements.saveSettingsBtn,
+            elements.openFolderBtn,
+            elements.refreshBtn,
             elements.archiveBtn,
             elements.deleteBtn,
             elements.openNewBtn,
@@ -1046,8 +1160,104 @@
         }
     `;
 
+    function cleanupTemporaryClipboardFile(imagePath) {
+        if (!imagePath) return;
+        fs.unlink(imagePath, error => {
+            if (error && error.code !== 'ENOENT') {
+                console.log('删除临时剪贴板图片失败:', imagePath, error);
+            }
+        });
+    }
+
+    function writeImageFileToWindowsClipboard(imagePath, callback) {
+        const powerShellScript = `
+$ErrorActionPreference = "Stop"
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
+Add-Type @'
+using System.Runtime.InteropServices;
+public static class HbirdClipboardNative {
+    [DllImport("user32.dll")]
+    public static extern uint GetClipboardSequenceNumber();
+}
+'@
+
+$imagePath = $env:HBIRD_CLIPBOARD_IMAGE
+if (-not $imagePath -or -not [System.IO.File]::Exists($imagePath)) {
+    throw "Clipboard image file not found"
+}
+
+$pngStream = $null
+$sourceImage = $null
+$bitmap = $null
+$beforeSequence = [HbirdClipboardNative]::GetClipboardSequenceNumber()
+
+try {
+    $pngBytes = [System.IO.File]::ReadAllBytes($imagePath)
+    $pngStream = [System.IO.MemoryStream]::new($pngBytes)
+    $sourceImage = [System.Drawing.Image]::FromStream($pngStream)
+    $bitmap = New-Object System.Drawing.Bitmap -ArgumentList $sourceImage
+    $pngStream.Position = 0
+
+    $dataObject = New-Object System.Windows.Forms.DataObject
+    $dataObject.SetData([System.Windows.Forms.DataFormats]::Bitmap, $true, $bitmap)
+    $dataObject.SetData("PNG", $false, $pngStream)
+    [System.Windows.Forms.Clipboard]::SetDataObject($dataObject, $true, 10, 100)
+
+    $afterSequence = [HbirdClipboardNative]::GetClipboardSequenceNumber()
+    $hasImage = [System.Windows.Forms.Clipboard]::ContainsImage()
+    $hasPng = [System.Windows.Forms.Clipboard]::ContainsData("PNG")
+    if ($afterSequence -eq $beforeSequence -or (-not $hasImage -and -not $hasPng)) {
+        throw "Clipboard verification failed"
+    }
+
+    Write-Output "HBIRD_WINDOWS_CLIPBOARD_IMAGE_READY"
+} finally {
+    if ($bitmap) { $bitmap.Dispose() }
+    if ($sourceImage) { $sourceImage.Dispose() }
+    if ($pngStream) { $pngStream.Dispose() }
+}
+        `;
+
+        childProcess.execFile('powershell.exe', [
+            '-NoProfile',
+            '-NonInteractive',
+            '-STA',
+            '-WindowStyle',
+            'Hidden',
+            '-Command',
+            powerShellScript
+        ], {
+            env: Object.assign({}, process.env, {
+                HBIRD_CLIPBOARD_IMAGE: path.win32.normalize(imagePath)
+            }),
+            windowsHide: true,
+            timeout: 15000,
+            encoding: 'utf8'
+        }, (error, stdout, stderr) => {
+            cleanupTemporaryClipboardFile(imagePath);
+
+            const output = String(stdout || '');
+            if (error || !output.includes('HBIRD_WINDOWS_CLIPBOARD_IMAGE_READY')) {
+                console.log('Windows 剪贴板直写失败:', {
+                    error: error && error.message,
+                    stderr: String(stderr || '').slice(0, 500)
+                });
+                callback(new Error('系统剪贴板写入失败，请稍后重试'));
+                return;
+            }
+
+            callback(null);
+        });
+    }
+
     function copyCurrentSelection() {
         setStatus('正在拷贝当前选区...');
+        const tempFilePath = path.join(
+            os.tmpdir(),
+            `HbirdBridge_clipboard_${Date.now()}_${Math.random().toString(36).slice(2)}.png`
+        );
+        const photoshopTempFilePath = tempFilePath.replace(/\\/g, '/');
 
         const script = `
             (function() {
@@ -1056,6 +1266,13 @@
                 var originalHistoryState = null;
                 var stampLayer = null;
                 var selectionLayer = null;
+                var tempDocument = null;
+                var exportFile = null;
+                var clipboardMaxEdge = ${CONFIG.clipboardMaxEdge};
+                var tempFilePath = ${JSON.stringify(photoshopTempFilePath)};
+                var optimized = false;
+                var outputWidth = 0;
+                var outputHeight = 0;
 
                 try {
                     if (app.documents.length === 0) {
@@ -1080,6 +1297,16 @@
                     }
 
                     originalHistoryState = doc.activeHistoryState;
+                    var selectionLeft = selectionBounds[0].as("px");
+                    var selectionTop = selectionBounds[1].as("px");
+                    var selectionWidth = Math.max(
+                        1,
+                        Math.round(selectionBounds[2].as("px") - selectionLeft)
+                    );
+                    var selectionHeight = Math.max(
+                        1,
+                        Math.round(selectionBounds[3].as("px") - selectionTop)
+                    );
 
                     var mergeDescriptor = new ActionDescriptor();
                     mergeDescriptor.putBoolean(charIDToTypeID("Dplc"), true);
@@ -1100,19 +1327,106 @@
                     }
 
                     selectionLayer.name = "选区拷贝";
-                    doc.selection.copy();
-
+                    var sourceLayerBounds = selectionLayer.bounds;
+                    var desiredContentLeft = sourceLayerBounds[0].as("px") - selectionLeft;
+                    var desiredContentTop = sourceLayerBounds[1].as("px") - selectionTop;
                     stampLayer.remove();
                     stampLayer = null;
                     doc.activeLayer = selectionLayer;
 
+                    tempDocument = app.documents.add(
+                        UnitValue(selectionWidth, "px"),
+                        UnitValue(selectionHeight, "px"),
+                        doc.resolution,
+                        "Hbird Bridge Clipboard",
+                        NewDocumentMode.RGB,
+                        DocumentFill.TRANSPARENT
+                    );
+
+                    app.activeDocument = doc;
+                    var exportLayer = selectionLayer.duplicate(
+                        tempDocument,
+                        ElementPlacement.PLACEATBEGINNING
+                    );
+                    app.activeDocument = tempDocument;
+                    tempDocument.activeLayer = exportLayer;
+                    var exportLayerBounds = exportLayer.bounds;
+                    exportLayer.translate(
+                        UnitValue(
+                            desiredContentLeft - exportLayerBounds[0].as("px"),
+                            "px"
+                        ),
+                        UnitValue(
+                            desiredContentTop - exportLayerBounds[1].as("px"),
+                            "px"
+                        )
+                    );
+
+                    outputWidth = selectionWidth;
+                    outputHeight = selectionHeight;
+                    var longestEdge = Math.max(selectionWidth, selectionHeight);
+                    if (longestEdge > clipboardMaxEdge) {
+                        executeAction(
+                            stringIDToTypeID("newPlacedLayer"),
+                            undefined,
+                            DialogModes.NO
+                        );
+
+                        var resizeRatio = clipboardMaxEdge / longestEdge;
+                        outputWidth = Math.max(1, Math.round(selectionWidth * resizeRatio));
+                        outputHeight = Math.max(1, Math.round(selectionHeight * resizeRatio));
+                        tempDocument.resizeImage(
+                            UnitValue(outputWidth, "px"),
+                            UnitValue(outputHeight, "px"),
+                            tempDocument.resolution,
+                            ResampleMethod.BICUBICSHARPER
+                        );
+                        optimized = true;
+                    }
+
+                    exportFile = new File(tempFilePath);
+                    if (exportFile.exists) {
+                        exportFile.remove();
+                    }
+                    var pngOptions = new PNGSaveOptions();
+                    pngOptions.interlaced = false;
+                    tempDocument.saveAs(exportFile, pngOptions, true, Extension.LOWERCASE);
+                    if (!exportFile.exists) {
+                        throw new Error("临时 PNG 导出失败");
+                    }
+
+                    tempDocument.close(SaveOptions.DONOTSAVECHANGES);
+                    tempDocument = null;
+                    app.activeDocument = doc;
+                    doc.activeLayer = selectionLayer;
+
                     return stringifyResponse({
                         success: true,
-                        layerName: selectionLayer.name
+                        layerName: selectionLayer.name,
+                        tempFilePath: tempFilePath,
+                        optimized: optimized,
+                        originalWidth: selectionWidth,
+                        originalHeight: selectionHeight,
+                        outputWidth: outputWidth,
+                        outputHeight: outputHeight
                     });
                 } catch(error) {
                     try {
+                        if (tempDocument) {
+                            app.activeDocument = tempDocument;
+                            tempDocument.close(SaveOptions.DONOTSAVECHANGES);
+                        }
+                    } catch(closeTempError) {}
+
+                    try {
+                        if (exportFile && exportFile.exists) {
+                            exportFile.remove();
+                        }
+                    } catch(removeTempError) {}
+
+                    try {
                         if (doc && originalHistoryState) {
+                            app.activeDocument = doc;
                             doc.activeHistoryState = originalHistoryState;
                         }
                     } catch(rollbackError) {}
@@ -1129,12 +1443,27 @@
             try {
                 const response = JSON.parse(result);
                 if (response.success) {
-                    setStatus('选区已生成新图层并拷贝到剪贴板');
+                    setStatus('正在写入 Windows 剪贴板...');
+                    writeImageFileToWindowsClipboard(response.tempFilePath, error => {
+                        if (!error) {
+                            const optimizationNote = response.optimized
+                                ? ` · 已优化至 ${response.outputWidth}×${response.outputHeight}`
+                                : '';
+                            setStatus(`选区已生成新图层并拷贝到 Windows 剪贴板${optimizationNote}`);
+                            return;
+                        }
+
+                        console.log('Windows 剪贴板复制失败:', error);
+                        alert('选区图层已生成，但 Windows 剪贴板复制失败：' + error.message);
+                        setStatus('选区已生成，但 Windows 剪贴板复制失败');
+                    });
                 } else {
+                    cleanupTemporaryClipboardFile(tempFilePath);
                     alert(response.error || '拷贝当前选区失败');
                     setStatus('拷贝当前选区失败');
                 }
             } catch(error) {
+                cleanupTemporaryClipboardFile(tempFilePath);
                 const rawResult = String(result || '无返回值').slice(0, 160);
                 console.log('拷贝选区脚本返回异常:', rawResult, error);
                 setStatus(`拷贝当前选区失败：${rawResult}`);
@@ -1263,6 +1592,7 @@
                             parentDocument.activeLayer.name = originalLayerName;
                         }
 
+                        var targetSmartLayer = parentDocument.activeLayer;
                         executeAction(stringIDToTypeID("placedLayerEditContents"), undefined, DialogModes.NO);
                         smartDocument = app.activeDocument;
 
@@ -1347,13 +1677,23 @@
                         smartDocument = null;
 
                         app.activeDocument = parentDocument;
-                        parentDocument.activeLayer.name = originalLayerName;
+                        parentDocument.activeLayer = targetSmartLayer;
+
+                        var isReplacedSmartObject = targetSmartLayer.typename === "ArtLayer" &&
+                            targetSmartLayer.kind === LayerKind.SMARTOBJECT;
+                        if (!isReplacedSmartObject) {
+                            throw new Error("替换后的目标图层不是智能对象，无法栅格化");
+                        }
+
+                        targetSmartLayer.rasterize(RasterizeType.ENTIRELAYER);
+                        targetSmartLayer.name = originalLayerName;
 
                         return stringifyResponse({
                             success: true,
                             imported: 1,
                             failed: 0,
-                            aspectAdjusted: aspectAdjusted
+                            aspectAdjusted: aspectAdjusted,
+                            rasterized: true
                         });
                     } catch(error) {
                         try {
@@ -1387,8 +1727,8 @@
                 if (response.success) {
                     const message = mode === 'smartObject'
                         ? (response.aspectAdjusted
-                            ? '智能对象导入完成（比例不同，已居中裁切）'
-                            : '智能对象导入完成')
+                            ? '智能对象导入完成并已栅格化（比例不同，已居中裁切）'
+                            : '智能对象导入完成并已栅格化')
                         : (response.failed > 0
                             ? `导入完成: 成功 ${response.imported}, 失败 ${response.failed}`
                             : `成功导入 ${response.imported} 张图片`);
@@ -1420,6 +1760,7 @@
 
     document.addEventListener('DOMContentLoaded', init);
     document.addEventListener('visibilitychange', handleVisibilityChange);
+    document.addEventListener('keydown', handleSettingsKeyDown);
 
     window.addEventListener('beforeunload', () => {
         stopAutoRefresh();
