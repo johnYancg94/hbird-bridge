@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<ExtensionManifest Version="7.0" ExtensionBundleId="com.hbird.bridge.ps.panel" ExtensionBundleVersion="1.9.4" ExtensionBundleName="Hbird Bridge">
+<ExtensionManifest Version="7.0" ExtensionBundleId="com.hbird.bridge.ps.panel" ExtensionBundleVersion="1.9.6" ExtensionBundleName="Hbird Bridge">
     <ExtensionList>
-        <Extension Id="com.hbird.bridge.ps.panel" Version="1.9.4"/>
+        <Extension Id="com.hbird.bridge.ps.panel" Version="1.9.6"/>
     </ExtensionList>
     <ExecutionEnvironment>
         <HostList>

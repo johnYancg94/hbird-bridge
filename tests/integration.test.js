@@ -34,7 +34,7 @@ assert(
     'manifest bundle id must use the Hbird Bridge identity'
 );
 assert(
-    manifest.includes('<Extension Id="com.hbird.bridge.ps.panel" Version="1.9.4"/>'),
+    manifest.includes('<Extension Id="com.hbird.bridge.ps.panel" Version="1.9.6"/>'),
     'manifest extension id and version must be current'
 );
 const maxSizeMatch = manifest.match(
@@ -220,6 +220,25 @@ assert(
 assert(
     /\.ratio-more-menu\s*\{[^}]*bottom:/s.test(style),
     'the bottom overflow menu must open upward'
+);
+assert(
+    /\.ratio-preset,\s*\.ratio-more-btn\s*\{[^}]*height:\s*24px;[^}]*min-height:\s*24px;/s.test(style),
+    'pinned ratio buttons must be ten percent taller than the 22px compact height'
+);
+assert(
+    /\.ratio-more-btn\s*\{[^}]*height:\s*100%;[^}]*min-height:\s*53px;/s.test(style),
+    'the ratio overflow trigger must be ten percent taller than the 48px compact height'
+);
+assert(
+    /\.ratio-more-menu \.ratio-preset\s*\{[^}]*height:\s*26px;[^}]*min-height:\s*26px;/s.test(style),
+    'overflow ratio choices must be ten percent taller than the 24px compact height'
+);
+const ratioLayer = style.match(/\.ratio-toolbar\s*\{[^}]*z-index:\s*(\d+);/s);
+const actionLayer = style.match(/\.action-buttons\s*\{[^}]*z-index:\s*(\d+);/s);
+assert(ratioLayer && actionLayer, 'ratio and action regions must define explicit stacking layers');
+assert(
+    Number(ratioLayer[1]) > Number(actionLayer[1]),
+    'the ratio toolbar stacking context must sit above the action buttons so its upward menu remains clickable'
 );
 assert(!style.includes('inset: 0'), 'settings overlay must remain compatible with CEP 9 Chromium');
 assert(
