@@ -6,15 +6,62 @@
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+    <svg class="icon-sprite" aria-hidden="true">
+        <symbol id="icon-folder" viewBox="0 0 24 24">
+            <path d="M3 7.5h6.2l2-2H21v13.2a1.8 1.8 0 0 1-1.8 1.8H4.8A1.8 1.8 0 0 1 3 18.7V7.5Z"/>
+            <path d="M3 9.5h18"/>
+        </symbol>
+        <symbol id="icon-archive" viewBox="0 0 24 24">
+            <path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Z"/>
+            <path d="m4.4 7.8 7.6 4.3 7.6-4.3M12 12v8.5"/>
+        </symbol>
+        <symbol id="icon-refresh" viewBox="0 0 24 24">
+            <path d="M20 7v5h-5"/><path d="M19 12a7 7 0 1 0-2.1 5"/>
+        </symbol>
+        <symbol id="icon-settings" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3A1.7 1.7 0 0 0 10 3V2.8h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z"/>
+        </symbol>
+        <symbol id="icon-check-square" viewBox="0 0 24 24">
+            <rect x="3" y="3" width="18" height="18" rx="3"/><path d="m7 12 3.2 3.2L17.5 8"/>
+        </symbol>
+        <symbol id="icon-trash" viewBox="0 0 24 24">
+            <path d="M4 7h16M9 7V4h6v3M6.5 7l.8 14h9.4l.8-14M10 11v6M14 11v6"/>
+        </symbol>
+        <symbol id="icon-file-plus" viewBox="0 0 24 24">
+            <path d="M6 3h8l4 4v14H6V3Z"/><path d="M14 3v5h5M9 14h6M12 11v6"/>
+        </symbol>
+        <symbol id="icon-layers" viewBox="0 0 24 24">
+            <path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5M3 16l9 5 9-5"/>
+        </symbol>
+        <symbol id="icon-copy-selection" viewBox="0 0 24 24">
+            <rect x="8" y="8" width="12" height="12" rx="2"/><path d="M4 15V6a2 2 0 0 1 2-2h9M4 9V6h3M10 4h3"/>
+        </symbol>
+        <symbol id="icon-smart-file" viewBox="0 0 24 24">
+            <path d="M5 3h9l5 5v13H5V3Z"/><path d="M14 3v6h6"/><rect x="8" y="13" width="7" height="5" rx="1"/>
+        </symbol>
+    </svg>
     <div class="container">
         <!-- 顶部工具栏 -->
         <div class="toolbar">
             <div class="toolbar-row toolbar-row-main">
-                <button id="openFolderBtn" class="btn">📂 打开当前文件夹</button>
-                <button id="archiveBtn" class="btn btn-archive">📦 一键归档</button>
-                <span id="autoRefreshIndicator" class="auto-refresh-indicator">● 自动监听中</span>
-                <button id="refreshBtn" class="btn btn-refresh" title="重新扫描素材" aria-label="重新扫描素材">↻</button>
-                <button id="settingsBtn" class="btn btn-settings" title="设置" aria-label="打开设置">⚙</button>
+                <button id="openFolderBtn" class="btn toolbar-command toolbar-command-open">
+                    <svg class="toolbar-icon" aria-hidden="true"><use xlink:href="#icon-folder"></use></svg>
+                    <span class="toolbar-button-label">打开目录</span>
+                </button>
+                <button id="archiveBtn" class="btn toolbar-command btn-archive">
+                    <svg class="toolbar-icon" aria-hidden="true"><use xlink:href="#icon-archive"></use></svg>
+                    <span class="toolbar-button-label">一键归档</span>
+                </button>
+                <span id="autoRefreshIndicator" class="auto-refresh-indicator is-active" role="status" aria-label="自动监听中" title="自动监听中">
+                    <span class="toolbar-status-dot"></span>
+                </span>
+                <button id="refreshBtn" class="btn btn-refresh icon-button" title="重新扫描素材" aria-label="重新扫描素材">
+                    <svg class="toolbar-icon" aria-hidden="true"><use xlink:href="#icon-refresh"></use></svg>
+                </button>
+                <button id="settingsBtn" class="btn btn-settings icon-button" title="设置" aria-label="打开设置">
+                    <svg class="toolbar-icon" aria-hidden="true"><use xlink:href="#icon-settings"></use></svg>
+                </button>
             </div>
         </div>
 
@@ -43,6 +90,12 @@
                             <button id="settingsBrowseDirBtn" class="btn btn-secondary">选择目录</button>
                             <button id="settingsOpenAssetsDirBtn" class="btn btn-secondary">打开目录</button>
                         </div>
+                        <button id="settingsUseBrowserDownloadsBtn" class="btn btn-browser-download">
+                            🌐 使用浏览器下载目录
+                        </button>
+                        <p id="browserDownloadStatus" class="browser-download-status" aria-live="polite">
+                            自动读取 Windows 默认浏览器的下载设置。
+                        </p>
                     </div>
 
                     <div class="settings-section settings-section-accent">
@@ -91,30 +144,88 @@
         <!-- 底部操作栏 -->
         <div class="action-bar">
             <div class="selection-info">
-                <span id="selectionCount">已选择 0 个</span>
-                <span class="hint-text">（Shift+点击 范围多选）</span>
+                <div class="selection-summary">
+                    <svg class="selection-summary-icon" aria-hidden="true"><use xlink:href="#icon-check-square"></use></svg>
+                    <span id="selectionCount">已选择 0 个</span>
+                    <span class="hint-text">（Shift+点击 范围多选）</span>
+                </div>
+                <div class="status-bar">
+                    <span id="statusText">就绪</span>
+                </div>
             </div>
             <div class="action-buttons">
                 <div class="action-button-row action-button-row-main">
-                    <button id="deleteBtn" class="btn btn-danger">🗑️ 删除</button>
-                    <button id="openNewBtn" class="btn btn-open">新建文档打开</button>
-                    <button id="placeLayerBtn" class="btn btn-place">作为图层导入</button>
+                    <button id="deleteBtn" class="btn btn-danger action-icon-only" aria-label="删除已选素材" data-tooltip="删除已选素材文件">
+                        <svg class="button-icon" aria-hidden="true"><use xlink:href="#icon-trash"></use></svg>
+                    </button>
+                    <button id="openNewBtn" class="btn btn-open action-icon-only" aria-label="新建文档打开" data-tooltip="将已选图片分别打开为新文档">
+                        <svg class="button-icon" aria-hidden="true"><use xlink:href="#icon-file-plus"></use></svg>
+                    </button>
+                    <button id="placeLayerBtn" class="btn btn-place btn-action-wide">
+                        <svg class="button-icon" aria-hidden="true"><use xlink:href="#icon-layers"></use></svg>
+                        <span>作为图层导入</span>
+                    </button>
                 </div>
                 <div class="action-button-row action-button-row-secondary">
-                    <button id="copySelectionBtn" class="btn btn-copy-selection" title="将当前框选区域生成新图层，并按设置优化后写入系统剪贴板">拷贝当前选区</button>
-                    <button id="smartObjectBtn" class="btn btn-smart" title="替换当前图层并保持原位置，完成后自动栅格化">智能对象导入</button>
+                    <button id="copySelectionBtn" class="btn btn-copy-selection btn-action-wide" title="将当前框选区域生成新图层，并按设置优化后写入系统剪贴板">
+                        <svg class="button-icon" aria-hidden="true"><use xlink:href="#icon-copy-selection"></use></svg>
+                        <span>拷贝当前选区</span>
+                    </button>
+                    <button id="smartObjectBtn" class="btn btn-smart btn-action-wide" title="替换当前图层并保持原位置，完成后自动栅格化">
+                        <svg class="button-icon" aria-hidden="true"><use xlink:href="#icon-smart-file"></use></svg>
+                        <span>智能对象导入</span>
+                    </button>
                 </div>
             </div>
-        </div>
-
-        <!-- 状态栏 -->
-        <div class="status-bar">
-            <span id="statusText">就绪</span>
+            <section class="ratio-toolbar" aria-label="矩形选区比例快捷键">
+                <div class="ratio-section-title" aria-hidden="true">
+                    <span>快速</span>
+                    <span>矩形选区</span>
+                </div>
+                <div id="ratioPresetBar" class="ratio-preset-bar" role="group" aria-label="常用矩形选区比例">
+                    <div class="ratio-primary-grid">
+                        <button class="ratio-preset" data-ratio-label="自由" data-ratio-mode="free" title="自由矩形选区">
+                            <span class="ratio-shape ratio-shape-free" aria-hidden="true"></span><span>自由</span>
+                        </button>
+                        <button class="ratio-preset" data-ratio-label="1:1" data-ratio-width="1" data-ratio-height="1" title="矩形选区 1:1">
+                            <span class="ratio-shape ratio-shape-1-1" aria-hidden="true"></span><span>1:1</span>
+                        </button>
+                        <button class="ratio-preset" data-ratio-label="9:16" data-ratio-width="9" data-ratio-height="16" title="矩形选区 9:16">
+                            <span class="ratio-shape ratio-shape-9-16" aria-hidden="true"></span><span>9:16</span>
+                        </button>
+                        <button class="ratio-preset" data-ratio-label="16:9" data-ratio-width="16" data-ratio-height="9" title="矩形选区 16:9">
+                            <span class="ratio-shape ratio-shape-16-9" aria-hidden="true"></span><span>16:9</span>
+                        </button>
+                        <button class="ratio-preset" data-ratio-label="3:4" data-ratio-width="3" data-ratio-height="4" title="矩形选区 3:4">
+                            <span class="ratio-shape ratio-shape-3-4" aria-hidden="true"></span><span>3:4</span>
+                        </button>
+                        <button class="ratio-preset" data-ratio-label="4:3" data-ratio-width="4" data-ratio-height="3" title="矩形选区 4:3">
+                            <span class="ratio-shape ratio-shape-4-3" aria-hidden="true"></span><span>4:3</span>
+                        </button>
+                    </div>
+                    <div class="ratio-more-wrap">
+                        <button id="ratioMoreBtn" class="ratio-more-btn" aria-label="更多矩形选区比例" aria-haspopup="true" aria-expanded="false" title="更多比例">…</button>
+                        <div id="ratioMoreMenu" class="ratio-more-menu is-hidden" role="menu" aria-label="更多矩形选区比例">
+                            <button class="ratio-preset" data-ratio-label="3:2" data-ratio-width="3" data-ratio-height="2" role="menuitem"><span class="ratio-shape ratio-shape-3-2" aria-hidden="true"></span><span>3:2</span></button>
+                            <button class="ratio-preset" data-ratio-label="2:3" data-ratio-width="2" data-ratio-height="3" role="menuitem"><span class="ratio-shape ratio-shape-2-3" aria-hidden="true"></span><span>2:3</span></button>
+                            <button class="ratio-preset" data-ratio-label="4:5" data-ratio-width="4" data-ratio-height="5" role="menuitem"><span class="ratio-shape ratio-shape-4-5" aria-hidden="true"></span><span>4:5</span></button>
+                            <button class="ratio-preset" data-ratio-label="5:4" data-ratio-width="5" data-ratio-height="4" role="menuitem"><span class="ratio-shape ratio-shape-5-4" aria-hidden="true"></span><span>5:4</span></button>
+                            <button class="ratio-preset" data-ratio-label="8:1" data-ratio-width="8" data-ratio-height="1" role="menuitem"><span class="ratio-shape ratio-shape-8-1" aria-hidden="true"></span><span>8:1</span></button>
+                            <button class="ratio-preset" data-ratio-label="1:8" data-ratio-width="1" data-ratio-height="8" role="menuitem"><span class="ratio-shape ratio-shape-1-8" aria-hidden="true"></span><span>1:8</span></button>
+                            <button class="ratio-preset" data-ratio-label="4:1" data-ratio-width="4" data-ratio-height="1" role="menuitem"><span class="ratio-shape ratio-shape-4-1" aria-hidden="true"></span><span>4:1</span></button>
+                            <button class="ratio-preset" data-ratio-label="1:4" data-ratio-width="1" data-ratio-height="4" role="menuitem"><span class="ratio-shape ratio-shape-1-4" aria-hidden="true"></span><span>1:4</span></button>
+                            <button class="ratio-preset" data-ratio-label="21:9" data-ratio-width="21" data-ratio-height="9" role="menuitem"><span class="ratio-shape ratio-shape-21-9" aria-hidden="true"></span><span>21:9</span></button>
+                        </div>
+                    </div>
+                </div>
+            </section>
         </div>
     </div>
 
     <script src="js/CSInterface.js"></script>
     <script src="js/asset-utils.js"></script>
+    <script src="js/browser-download-utils.js"></script>
+    <script src="js/marquee-ratio-utils.js"></script>
     <script src="js/main.js"></script>
 </body>
 </html>

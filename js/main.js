@@ -1,6 +1,6 @@
 /**
  * Hbird Bridge - 主逻辑
- * 版本 1.6.1 - 优化工具栏：目录打开主按钮与独立手动刷新入口
+ * 版本 1.9.4 - 两排操作按钮高度压缩至 70%
  */
 
 (function() {
@@ -33,6 +33,14 @@
     if (!AssetUtils) {
         throw new Error('asset-utils.js 未正确加载');
     }
+    const BrowserDownloadUtils = window.HbirdBridgeBrowserDownloadUtils;
+    if (!BrowserDownloadUtils) {
+        throw new Error('browser-download-utils.js 未正确加载');
+    }
+    const MarqueeRatioUtils = window.HbirdBridgeMarqueeRatioUtils;
+    if (!MarqueeRatioUtils) {
+        throw new Error('marquee-ratio-utils.js 未正确加载');
+    }
 
     const supportedImageSet = new Set(CONFIG.supportedImages);
     const thumbnailQueue = AssetUtils.createTaskQueue(4);
@@ -52,6 +60,8 @@
     let thumbnailObserver = null;
     let fallbackLazyCards = new Set();
     let fallbackCheckScheduled = false;
+    let browserDirectoryDetectionInProgress = false;
+    let marqueeRatioInProgress = false;
 
     // DOM 元素
     let elements = {};
@@ -71,10 +81,15 @@
             settingsAssetsDir: document.getElementById('settingsAssetsDir'),
             settingsBrowseDirBtn: document.getElementById('settingsBrowseDirBtn'),
             settingsOpenAssetsDirBtn: document.getElementById('settingsOpenAssetsDirBtn'),
+            settingsUseBrowserDownloadsBtn: document.getElementById('settingsUseBrowserDownloadsBtn'),
+            browserDownloadStatus: document.getElementById('browserDownloadStatus'),
             settingsClipboardMaxEdge: document.getElementById('settingsClipboardMaxEdge'),
             openFolderBtn: document.getElementById('openFolderBtn'),
             refreshBtn: document.getElementById('refreshBtn'),
             archiveBtn: document.getElementById('archiveBtn'),
+            ratioPresetBar: document.getElementById('ratioPresetBar'),
+            ratioMoreBtn: document.getElementById('ratioMoreBtn'),
+            ratioMoreMenu: document.getElementById('ratioMoreMenu'),
             assetsContainer: document.querySelector('.assets-container'),
             assetsGrid: document.getElementById('assetsGrid'),
             selectionCount: document.getElementById('selectionCount'),
@@ -95,6 +110,7 @@
         elements.cancelSettingsBtn.addEventListener('click', closeSettings);
         elements.saveSettingsBtn.addEventListener('click', applySettings);
         elements.settingsBrowseDirBtn.addEventListener('click', browseDir);
+        elements.settingsUseBrowserDownloadsBtn.addEventListener('click', useBrowserDownloadDirectory);
         elements.settingsOpenAssetsDirBtn.addEventListener('click', () => {
             openAssetsDirectory(elements.settingsAssetsDir.value);
         });
@@ -104,6 +120,9 @@
             }
         });
         elements.archiveBtn.addEventListener('click', archiveOldImages);
+        elements.ratioPresetBar.addEventListener('click', handleRatioPresetClick);
+        elements.ratioMoreBtn.addEventListener('click', toggleRatioMenu);
+        document.addEventListener('click', handleRatioMenuOutsideClick);
         elements.deleteBtn.addEventListener('click', deleteSelectedAssets);
         elements.openNewBtn.addEventListener('click', () => importToPS('open'));
         elements.placeLayerBtn.addEventListener('click', () => importToPS('place'));
@@ -143,8 +162,11 @@
 
     function setAutoRefreshIndicator(active) {
         if (!elements.autoRefreshIndicator) return;
-        elements.autoRefreshIndicator.style.color = active ? '#4CAF50' : '#777';
-        elements.autoRefreshIndicator.textContent = active ? '● 自动监听中' : '● 已暂停监听';
+        elements.autoRefreshIndicator.classList.toggle('is-active', active);
+        elements.autoRefreshIndicator.classList.toggle('is-paused', !active);
+        const label = active ? '自动监听中' : '监听已暂停';
+        elements.autoRefreshIndicator.setAttribute('aria-label', label);
+        elements.autoRefreshIndicator.title = label;
     }
 
     function checkForNewFiles() {
@@ -154,11 +176,9 @@
 
     function flashAutoRefreshIndicator() {
         if (!elements.autoRefreshIndicator) return;
-        elements.autoRefreshIndicator.style.color = '#FFD700';
+        elements.autoRefreshIndicator.classList.add('is-flashing');
         setTimeout(() => {
-            if (autoRefreshTimer) {
-                elements.autoRefreshIndicator.style.color = '#4CAF50';
-            }
+            elements.autoRefreshIndicator.classList.remove('is-flashing');
         }, 500);
     }
 
@@ -173,6 +193,105 @@
             }
             scheduleFallbackVisibilityCheck();
         }
+    }
+
+    // ==================== 矩形选区比例 ====================
+
+    function findRatioPresetButton(target) {
+        let node = target;
+        while (node && node !== elements.ratioPresetBar) {
+            if (node.classList && node.classList.contains('ratio-preset')) {
+                return node;
+            }
+            node = node.parentNode;
+        }
+        return null;
+    }
+
+    function handleRatioPresetClick(event) {
+        const button = findRatioPresetButton(event.target);
+        if (!button || marqueeRatioInProgress) return;
+
+        const label = button.getAttribute('data-ratio-label') || '';
+        const freeMode = button.getAttribute('data-ratio-mode') === 'free';
+        const width = freeMode ? null : Number(button.getAttribute('data-ratio-width'));
+        const height = freeMode ? null : Number(button.getAttribute('data-ratio-height'));
+        const isOverflowPreset = elements.ratioMoreMenu.contains(button);
+
+        closeRatioMenu();
+        applyMarqueeRatio(width, height, label, freeMode, isOverflowPreset);
+    }
+
+    function toggleRatioMenu(event) {
+        if (event) event.stopPropagation();
+        if (marqueeRatioInProgress) return;
+        const willOpen = elements.ratioMoreMenu.classList.contains('is-hidden');
+        elements.ratioMoreMenu.classList.toggle('is-hidden', !willOpen);
+        elements.ratioMoreBtn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+    }
+
+    function closeRatioMenu() {
+        if (!elements.ratioMoreMenu || !elements.ratioMoreBtn) return;
+        elements.ratioMoreMenu.classList.add('is-hidden');
+        elements.ratioMoreBtn.setAttribute('aria-expanded', 'false');
+    }
+
+    function handleRatioMenuOutsideClick(event) {
+        if (!elements.ratioPresetBar || elements.ratioPresetBar.contains(event.target)) return;
+        closeRatioMenu();
+    }
+
+    function setMarqueeRatioBusy(busy) {
+        marqueeRatioInProgress = busy;
+        const presetButtons = elements.ratioPresetBar.querySelectorAll('.ratio-preset');
+        for (let index = 0; index < presetButtons.length; index += 1) {
+            presetButtons[index].disabled = busy;
+        }
+        elements.ratioMoreBtn.disabled = busy;
+    }
+
+    function setActiveMarqueeRatio(label, isOverflowPreset) {
+        const presetButtons = elements.ratioPresetBar.querySelectorAll('.ratio-preset');
+        for (let index = 0; index < presetButtons.length; index += 1) {
+            const button = presetButtons[index];
+            button.classList.toggle('is-active', button.getAttribute('data-ratio-label') === label);
+        }
+        elements.ratioMoreBtn.classList.toggle('has-active-preset', isOverflowPreset);
+        elements.ratioMoreBtn.title = isOverflowPreset ? `更多比例 · 当前 ${label}` : '更多比例';
+        elements.ratioMoreBtn.setAttribute(
+            'aria-label',
+            isOverflowPreset ? `更多矩形选区比例，当前 ${label}` : '更多矩形选区比例'
+        );
+    }
+
+    function applyMarqueeRatio(width, height, label, freeMode, isOverflowPreset) {
+        let script;
+        try {
+            script = MarqueeRatioUtils.buildMarqueeRatioScript(width, height, freeMode);
+        } catch (error) {
+            alert('矩形选区比例无效：' + error.message);
+            setStatus('矩形选区比例无效');
+            return;
+        }
+
+        setMarqueeRatioBusy(true);
+        setStatus(freeMode ? '正在切换矩形选区为自适应...' : `正在设置矩形选区比例 ${label}...`);
+        csInterface.evalScript(script, result => {
+            setMarqueeRatioBusy(false);
+            const response = String(result || '').trim();
+            if (response === 'OK') {
+                setActiveMarqueeRatio(label, isOverflowPreset);
+                setStatus(freeMode ? '矩形选区已切换为自适应' : `矩形选区比例已设为 ${label}`);
+                return;
+            }
+
+            const detail = response.indexOf('ERROR:') === 0
+                ? response.slice(6)
+                : (response || 'Photoshop 未返回结果');
+            console.log('矩形选区比例设置失败:', detail);
+            alert('矩形选区比例设置失败：' + detail);
+            setStatus('矩形选区比例设置失败');
+        });
     }
 
     // ==================== 设置管理 ====================
@@ -252,6 +371,7 @@
 
     function openSettings() {
         syncSettingsFields();
+        setBrowserDownloadStatus('自动读取 Windows 默认浏览器的下载设置。', '');
         elements.settingsOverlay.classList.remove('is-hidden');
         elements.settingsOverlay.setAttribute('aria-hidden', 'false');
         setTimeout(() => elements.settingsClipboardMaxEdge.focus(), 0);
@@ -259,11 +379,15 @@
 
     function closeSettings() {
         if (!elements.settingsOverlay) return;
+        if (browserDirectoryDetectionInProgress) return;
         elements.settingsOverlay.classList.add('is-hidden');
         elements.settingsOverlay.setAttribute('aria-hidden', 'true');
     }
 
     function handleSettingsKeyDown(event) {
+        if (event.key === 'Escape') {
+            closeRatioMenu();
+        }
         if (event.key === 'Escape' &&
             elements.settingsOverlay &&
             !elements.settingsOverlay.classList.contains('is-hidden')) {
@@ -279,7 +403,487 @@
         }
     }
 
+    function setBrowserDownloadStatus(message, tone) {
+        if (!elements.browserDownloadStatus) return;
+        elements.browserDownloadStatus.textContent = message;
+        if (tone) {
+            elements.browserDownloadStatus.setAttribute('data-tone', tone);
+        } else {
+            elements.browserDownloadStatus.removeAttribute('data-tone');
+        }
+    }
+
+    function setBrowserDirectoryDetectionBusy(busy) {
+        browserDirectoryDetectionInProgress = busy;
+        const locked = busy || archiveInProgress;
+        const controls = [
+            elements.settingsUseBrowserDownloadsBtn,
+            elements.settingsBrowseDirBtn,
+            elements.settingsOpenAssetsDirBtn,
+            elements.saveSettingsBtn,
+            elements.cancelSettingsBtn,
+            elements.closeSettingsBtn
+        ];
+        controls.forEach(control => {
+            if (control) control.disabled = locked;
+        });
+        elements.settingsUseBrowserDownloadsBtn.textContent = busy
+            ? '正在检测...'
+            : '🌐 使用浏览器下载目录';
+    }
+
+    function queryRegistryString(keyPath, valueName) {
+        const powerShellScript = `
+$ErrorActionPreference = "Stop"
+[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+$key = Get-Item -LiteralPath $env:HBIRD_REGISTRY_PATH
+$valueName = $env:HBIRD_REGISTRY_VALUE
+if ($valueName) {
+    $value = $key.GetValue(
+        $valueName,
+        $null,
+        [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames
+    )
+} else {
+    $value = $key.GetValue(
+        "",
+        $null,
+        [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames
+    )
+}
+if ($null -eq $value) {
+    exit 2
+}
+[Console]::Out.Write([string]$value)
+        `;
+
+        return new Promise(resolve => {
+            childProcess.execFile('powershell.exe', [
+                '-NoProfile',
+                '-NonInteractive',
+                '-WindowStyle',
+                'Hidden',
+                '-Command',
+                powerShellScript
+            ], {
+                windowsHide: true,
+                encoding: 'utf8',
+                timeout: 5000,
+                env: Object.assign({}, process.env, {
+                    HBIRD_REGISTRY_PATH: keyPath,
+                    HBIRD_REGISTRY_VALUE: valueName || ''
+                })
+            }, (error, stdout) => {
+                if (error) {
+                    resolve('');
+                    return;
+                }
+                resolve(String(stdout || '').trim());
+            });
+        });
+    }
+
+    function readTextFile(filePath) {
+        return new Promise((resolve, reject) => {
+            fs.readFile(filePath, 'utf8', (error, content) => {
+                if (error) {
+                    reject(error);
+                    return;
+                }
+                resolve(content);
+            });
+        });
+    }
+
+    function resolveExistingDirectory(directoryPath) {
+        if (!directoryPath) return Promise.resolve('');
+
+        const expandedPath = BrowserDownloadUtils.expandEnvironmentVariables(
+            directoryPath,
+            process.env
+        );
+        const normalizedPath = path.win32.normalize(expandedPath);
+
+        return new Promise(resolve => {
+            fs.stat(normalizedPath, (error, stats) => {
+                resolve(!error && stats.isDirectory() ? normalizedPath : '');
+            });
+        });
+    }
+
+    function getBrowserProfileSpec(browserId) {
+        const localAppData = process.env.LOCALAPPDATA ||
+            path.join(os.homedir(), 'AppData', 'Local');
+        const appData = process.env.APPDATA ||
+            path.join(os.homedir(), 'AppData', 'Roaming');
+
+        const specs = {
+            edge: {
+                type: 'chromium',
+                root: path.join(localAppData, 'Microsoft', 'Edge', 'User Data')
+            },
+            chrome: {
+                type: 'chromium',
+                root: path.join(localAppData, 'Google', 'Chrome', 'User Data')
+            },
+            brave: {
+                type: 'chromium',
+                root: path.join(localAppData, 'BraveSoftware', 'Brave-Browser', 'User Data')
+            },
+            vivaldi: {
+                type: 'chromium',
+                root: path.join(localAppData, 'Vivaldi', 'User Data')
+            },
+            quark: {
+                type: 'chromium',
+                root: path.join(localAppData, 'Quark', 'User Data')
+            },
+            opera: {
+                type: 'chromium',
+                preferencesFile: path.join(appData, 'Opera Software', 'Opera Stable', 'Preferences')
+            },
+            firefox: {
+                type: 'firefox',
+                root: path.join(appData, 'Mozilla', 'Firefox')
+            },
+            zen: {
+                type: 'firefox',
+                root: path.join(appData, 'zen')
+            }
+        };
+
+        return specs[browserId] || null;
+    }
+
+    function detectSingleInstalledBrowser() {
+        const browsers = [
+            { id: 'edge', name: 'Microsoft Edge' },
+            { id: 'chrome', name: 'Google Chrome' },
+            { id: 'brave', name: 'Brave' },
+            { id: 'vivaldi', name: 'Vivaldi' },
+            { id: 'quark', name: '夸克浏览器' },
+            { id: 'opera', name: 'Opera' },
+            { id: 'firefox', name: 'Mozilla Firefox' },
+            { id: 'zen', name: 'Zen Browser' }
+        ];
+        const installed = browsers.filter(browser => {
+            const spec = getBrowserProfileSpec(browser.id);
+            const probePath = spec.preferencesFile ||
+                (spec.type === 'firefox' ? path.join(spec.root, 'profiles.ini') : spec.root);
+            return fs.existsSync(probePath);
+        });
+        return installed.length === 1 ? installed[0] : null;
+    }
+
+    function detectDefaultBrowser() {
+        const userChoicePath =
+            'Registry::HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\Shell\\Associations\\' +
+            'UrlAssociations\\https\\UserChoice';
+
+        function identifyBrowserCommand(command) {
+            const browser = BrowserDownloadUtils.identifyBrowser(command);
+            if (!browser) return null;
+
+            const executablePath = BrowserDownloadUtils.extractExecutablePath(command);
+            return Object.assign({}, browser, {
+                executablePath,
+                installDirectory: executablePath ? path.win32.dirname(executablePath) : ''
+            });
+        }
+
+        return queryRegistryString(userChoicePath, 'ProgId').then(progId => {
+            if (!progId) {
+                return queryRegistryString(
+                    'Registry::HKEY_CLASSES_ROOT\\https\\shell\\open\\command',
+                    null
+                ).then(command => {
+                    return identifyBrowserCommand(command) || detectSingleInstalledBrowser();
+                });
+            }
+
+            const commandPath =
+                `Registry::HKEY_CLASSES_ROOT\\${progId}\\shell\\open\\command`;
+            return queryRegistryString(commandPath, null).then(command => {
+                return identifyBrowserCommand(command) || {
+                    id: 'unsupported',
+                    name: '当前默认浏览器',
+                    executablePath: '',
+                    installDirectory: ''
+                };
+            });
+        });
+    }
+
+    function readChromiumDownloadDirectory(spec) {
+        function parsePreferences(content) {
+            try {
+                JSON.parse(content);
+            } catch (error) {
+                return {
+                    state: 'error',
+                    directory: '',
+                    reason: '浏览器 Preferences 格式无效'
+                };
+            }
+
+            const directory = BrowserDownloadUtils.parseChromiumDownloadDirectory(content);
+            return {
+                state: directory ? 'configured' : 'not-configured',
+                directory,
+                reason: ''
+            };
+        }
+
+        if (spec.preferencesFile) {
+            return readTextFile(spec.preferencesFile).then(
+                parsePreferences,
+                () => ({
+                    state: 'error',
+                    directory: '',
+                    reason: '无法读取浏览器 Preferences'
+                })
+            );
+        }
+
+        const localStatePath = path.join(spec.root, 'Local State');
+        return readTextFile(localStatePath).then(content => {
+            try {
+                JSON.parse(content);
+            } catch (error) {
+                return {
+                    state: 'error',
+                    profileName: '',
+                    reason: '浏览器 Local State 格式无效'
+                };
+            }
+            return {
+                state: 'ready',
+                profileName: BrowserDownloadUtils.parseChromiumLastUsed(content),
+                reason: ''
+            };
+        }, () => ({
+            state: 'error',
+            profileName: '',
+            reason: '无法读取浏览器 Local State'
+        })).then(profileResult => {
+            if (profileResult.state === 'error') {
+                return {
+                    state: 'error',
+                    directory: '',
+                    reason: profileResult.reason
+                };
+            }
+
+            const profileName = profileResult.profileName;
+            const preferencesPath = path.join(spec.root, profileName, 'Preferences');
+            return readTextFile(preferencesPath).then(
+                parsePreferences,
+                () => ({
+                    state: 'error',
+                    directory: '',
+                    reason: `无法读取浏览器配置 ${profileName}`
+                })
+            );
+        });
+    }
+
+    function readFirefoxDownloadDirectory(spec, browser) {
+        return readTextFile(path.join(spec.root, 'profiles.ini')).then(profilesIni => {
+            return readTextFile(path.join(spec.root, 'installs.ini')).then(
+                installsIni => ({ profilesIni, installsIni }),
+                () => ({ profilesIni, installsIni: '' })
+            );
+        }, () => null).then(profileConfig => {
+            if (!profileConfig) {
+                return {
+                    state: 'error',
+                    directory: '',
+                    reason: '无法读取 Firefox profiles.ini'
+                };
+            }
+
+            const candidates = BrowserDownloadUtils.listFirefoxProfileCandidates(
+                profileConfig.profilesIni,
+                profileConfig.installsIni
+            );
+            return Promise.all(candidates.map(candidate => {
+                const candidatePath = candidate.isRelative
+                    ? path.win32.resolve(spec.root, candidate.path)
+                    : path.win32.normalize(candidate.path);
+                return readTextFile(path.join(candidatePath, 'compatibility.ini')).then(
+                    content => ({ profilePath: candidate.path, content }),
+                    () => ({ profilePath: candidate.path, content: '' })
+                );
+            })).then(compatibilityFiles => {
+                const compatibilityByProfile = {};
+                compatibilityFiles.forEach(file => {
+                    compatibilityByProfile[file.profilePath] = file.content;
+                });
+                return BrowserDownloadUtils.parseFirefoxProfilesIni(
+                    profileConfig.profilesIni,
+                    profileConfig.installsIni,
+                    {
+                        installDirectory: browser && browser.installDirectory
+                            ? browser.installDirectory
+                            : '',
+                        compatibilityByProfile
+                    }
+                );
+            });
+        }).then(profile => {
+            if (!profile || profile.state === 'error') {
+                if (profile && profile.state === 'error') return profile;
+                return {
+                    state: 'error',
+                    directory: '',
+                    reason: 'Firefox 默认 profile 不存在'
+                };
+            }
+
+            const profilePath = profile.isRelative
+                ? path.win32.resolve(spec.root, profile.path)
+                : path.win32.normalize(profile.path);
+            return readTextFile(path.join(profilePath, 'prefs.js')).then(
+                content => {
+                    const directory = BrowserDownloadUtils.parseFirefoxDownloadDirectory(content);
+                    return {
+                        state: directory ? 'configured' : 'not-configured',
+                        directory,
+                        reason: ''
+                    };
+                },
+                () => ({
+                    state: 'error',
+                    directory: '',
+                    reason: '无法读取 Firefox prefs.js'
+                })
+            );
+        });
+    }
+
+    function readBrowserConfiguredDownloadDirectory(browser) {
+        if (!browser) {
+            return Promise.resolve({
+                state: 'error',
+                directory: '',
+                reason: '未识别 Windows 默认浏览器'
+            });
+        }
+        const spec = getBrowserProfileSpec(browser.id);
+        if (!spec) {
+            return Promise.resolve({
+                state: 'error',
+                directory: '',
+                reason: `暂不支持 ${browser.name} 配置`
+            });
+        }
+
+        const configuredResult = spec.type === 'firefox'
+            ? readFirefoxDownloadDirectory(spec, browser)
+            : readChromiumDownloadDirectory(spec);
+        return configuredResult.then(result => {
+            if (result.state !== 'configured') return result;
+            return resolveExistingDirectory(result.directory).then(existingDirectory => {
+                if (existingDirectory) {
+                    return {
+                        state: 'configured',
+                        directory: existingDirectory,
+                        reason: ''
+                    };
+                }
+                return {
+                    state: 'error',
+                    directory: '',
+                    reason: '浏览器下载目录不存在或不可访问'
+                };
+            });
+        });
+    }
+
+    function readWindowsDownloadsDirectory() {
+        const downloadsRegistryKey =
+            'Registry::HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\' +
+            'Explorer\\User Shell Folders';
+        const downloadsKnownFolder = '{374DE290-123F-4565-9164-39C4925E467B}';
+
+        return queryRegistryString(downloadsRegistryKey, downloadsKnownFolder).then(directoryPath => {
+            return resolveExistingDirectory(directoryPath);
+        }).then(directoryPath => {
+            if (directoryPath) return directoryPath;
+            return resolveExistingDirectory(path.join(os.homedir(), 'Downloads'));
+        });
+    }
+
+    function resolveBrowserDownloadDirectory() {
+        return detectDefaultBrowser().then(browser => {
+            return readBrowserConfiguredDownloadDirectory(browser).then(browserResult => {
+                if (browserResult.state === 'configured') {
+                    return {
+                        directory: browserResult.directory,
+                        browserName: browser ? browser.name : '默认浏览器',
+                        source: 'browser',
+                        fallbackReason: ''
+                    };
+                }
+
+                return readWindowsDownloadsDirectory().then(systemDirectory => {
+                    if (!systemDirectory) {
+                        throw new Error('未找到可用的浏览器或 Windows 下载目录');
+                    }
+                    return {
+                        directory: systemDirectory,
+                        browserName: browser ? browser.name : '默认浏览器',
+                        source: 'windows',
+                        fallbackReason: browserResult.state === 'error'
+                            ? 'read-error'
+                            : 'not-configured',
+                        fallbackDetail: browserResult.reason || ''
+                    };
+                });
+            });
+        });
+    }
+
+    function useBrowserDownloadDirectory() {
+        if (browserDirectoryDetectionInProgress) return;
+
+        setBrowserDirectoryDetectionBusy(true);
+        setBrowserDownloadStatus('正在读取默认浏览器配置...', '');
+
+        function finishBrowserDirectoryDetection() {
+            setBrowserDirectoryDetectionBusy(false);
+        }
+
+        resolveBrowserDownloadDirectory().then(result => {
+            elements.settingsAssetsDir.value = result.directory;
+            let sourceLabel = '浏览器下载目录';
+            if (result.source === 'windows' && result.fallbackReason === 'read-error') {
+                sourceLabel = `配置读取失败，已回退 Windows 下载目录：${result.fallbackDetail}`;
+            } else if (result.source === 'windows') {
+                sourceLabel = '未设置自定义路径，使用 Windows 下载目录';
+            }
+            setBrowserDownloadStatus(
+                `已识别 ${result.browserName} · ${sourceLabel}`,
+                'success'
+            );
+            setStatus('已填入浏览器下载目录，保存设置后生效');
+            finishBrowserDirectoryDetection();
+        }, error => {
+            console.log('识别浏览器下载目录失败:', error);
+            setBrowserDownloadStatus(
+                '识别失败，请使用“选择目录”手动指定。',
+                'error'
+            );
+            setStatus('浏览器下载目录识别失败');
+            finishBrowserDirectoryDetection();
+        });
+    }
+
     function applySettings() {
+        if (browserDirectoryDetectionInProgress) {
+            setStatus('请等待浏览器下载目录检测完成');
+            return;
+        }
         if (archiveInProgress) {
             alert('正在归档图片，请等待归档完成后再保存设置');
             setStatus('归档期间不能修改设置');
@@ -1068,6 +1672,7 @@
         const controls = [
             elements.settingsBtn,
             elements.settingsBrowseDirBtn,
+            elements.settingsUseBrowserDownloadsBtn,
             elements.saveSettingsBtn,
             elements.openFolderBtn,
             elements.refreshBtn,

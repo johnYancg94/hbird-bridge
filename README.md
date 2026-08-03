@@ -6,7 +6,12 @@ Hbird Bridge 是一个 Windows 平台的 Photoshop CEP 素材联动面板，用�
 
 - 异步扫描素材目录，支持大量图片的懒加载缩略图。
 - 通过齿轮设置素材目录，并自动监听新图片。
+- 可自动读取 Windows 默认浏览器的下载目录，支持夸克、Zen、Edge、Chrome、Brave、Vivaldi、Opera 和 Firefox。
 - 主工具栏可直接打开当前素材目录，并通过循环图标手动刷新素材。
+- 面板支持独立调整宽度和高度；宽面板会自动扩展素材列数。
+- 顶部工具栏采用紧凑高度；删除和新建文档操作使用纯图标按钮，并在悬停或键盘聚焦时显示说明。
+- 两排主要操作按钮压缩为原高度的 70%，减少固定操作区占用。
+- 底部快速矩形选区：自由模式和常用比例采用两行布局，每个比例带对应白色描边图标；点击后自动切换到矩形选框工具，其他比例收纳在 `…` 菜单。
 - 一键归档：保留最新 10 张图片，其余按周归档。
 - 新建文档打开和普通像素图层导入。
 - 智能对象导入：替换当前图层并保持原位置，完成后自动栅格化目标图层。
@@ -39,9 +44,12 @@ Hbird Bridge 是一个 Windows 平台的 Photoshop CEP 素材联动面板，用�
 
 ```powershell
 node --check js/main.js
+node --check js/marquee-ratio-utils.js
+node tests/marquee-ratio-utils.test.js
 node tests/asset-utils.test.js
+node tests/browser-download-utils.test.js
 node tests/copy-selection.test.js
 node tests/integration.test.js
 ```
 
-当前版本：`1.6.1`
+当前版本：`1.9.4`

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<ExtensionManifest Version="7.0" ExtensionBundleId="com.hbird.bridge.ps.panel" ExtensionBundleVersion="1.6.1" ExtensionBundleName="Hbird Bridge">
+<ExtensionManifest Version="7.0" ExtensionBundleId="com.hbird.bridge.ps.panel" ExtensionBundleVersion="1.9.4" ExtensionBundleName="Hbird Bridge">
     <ExtensionList>
-        <Extension Id="com.hbird.bridge.ps.panel" Version="1.6.1"/>
+        <Extension Id="com.hbird.bridge.ps.panel" Version="1.9.4"/>
     </ExtensionList>
     <ExecutionEnvironment>
         <HostList>
@@ -37,6 +37,10 @@
                             <Height>550</Height>
                             <Width>380</Width>
                         </Size>
+                        <MaxSize>
+                            <Height>2400</Height>
+                            <Width>2400</Width>
+                        </MaxSize>
                         <MinSize>
                             <Height>400</Height>
                             <Width>300</Width>
