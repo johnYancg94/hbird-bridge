@@ -19,7 +19,9 @@ const installGuide = fs.readFileSync(path.join(root, '安装说明.txt'), 'utf8'
 const readme = fs.readFileSync(path.join(root, 'README.md'), 'utf8');
 const changelog = fs.readFileSync(path.join(root, 'CHANGELOG.md'), 'utf8');
 const packageScript = fs.readFileSync(path.join(root, 'scripts', 'package-release.ps1'), 'utf8');
-const releaseWorkflow = fs.readFileSync(path.join(root, '.github', 'workflows', 'release.yml'), 'utf8');
+const releaseWorkflow = fs
+    .readFileSync(path.join(root, '.github', 'workflows', 'release.yml'), 'utf8')
+    .replace(/\r\n/g, '\n');
 
 const utilsPosition = index.indexOf('js/asset-utils.js');
 const browserUtilsPosition = index.indexOf('js/browser-download-utils.js');
