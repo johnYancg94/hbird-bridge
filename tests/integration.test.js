@@ -11,6 +11,7 @@ const main = fs.readFileSync(path.join(root, 'js', 'main.js'), 'utf8');
 const assetUtils = fs.readFileSync(path.join(root, 'js', 'asset-utils.js'), 'utf8');
 const browserDownloadUtils = fs.readFileSync(path.join(root, 'js', 'browser-download-utils.js'), 'utf8');
 const marqueeRatioUtils = fs.readFileSync(path.join(root, 'js', 'marquee-ratio-utils.js'), 'utf8');
+const directoryHistoryUtils = fs.readFileSync(path.join(root, 'js', 'directory-history-utils.js'), 'utf8');
 const manifest = fs.readFileSync(path.join(root, 'CSXS', 'manifest.xml'), 'utf8');
 const debugConfig = fs.readFileSync(path.join(root, '.debug'), 'utf8');
 const installer = fs.readFileSync(path.join(root, '一键安装.bat'), 'utf8');
@@ -20,6 +21,7 @@ const readme = fs.readFileSync(path.join(root, 'README.md'), 'utf8');
 const utilsPosition = index.indexOf('js/asset-utils.js');
 const browserUtilsPosition = index.indexOf('js/browser-download-utils.js');
 const marqueeRatioUtilsPosition = index.indexOf('js/marquee-ratio-utils.js');
+const directoryHistoryUtilsPosition = index.indexOf('js/directory-history-utils.js');
 const mainPosition = index.indexOf('js/main.js');
 
 assert(utilsPosition >= 0, 'index.html must load asset-utils.js');
@@ -28,13 +30,15 @@ assert(browserUtilsPosition >= 0, 'index.html must load browser-download-utils.j
 assert(browserUtilsPosition < mainPosition, 'browser-download-utils.js must load before main.js');
 assert(marqueeRatioUtilsPosition >= 0, 'index.html must load marquee-ratio-utils.js');
 assert(marqueeRatioUtilsPosition < mainPosition, 'marquee-ratio-utils.js must load before main.js');
+assert(directoryHistoryUtilsPosition >= 0, 'index.html must load directory-history-utils.js');
+assert(directoryHistoryUtilsPosition < mainPosition, 'directory-history-utils.js must load before main.js');
 assert(index.includes('<title>Hbird Bridge</title>'), 'document title must use the Hbird Bridge brand');
 assert(
     manifest.includes('ExtensionBundleId="com.hbird.bridge.ps.panel"'),
     'manifest bundle id must use the Hbird Bridge identity'
 );
 assert(
-    manifest.includes('<Extension Id="com.hbird.bridge.ps.panel" Version="1.9.6"/>'),
+    manifest.includes('<Extension Id="com.hbird.bridge.ps.panel" Version="1.11.1"/>'),
     'manifest extension id and version must be current'
 );
 const maxSizeMatch = manifest.match(
@@ -127,7 +131,13 @@ const copySelectionButtonPosition = index.indexOf('id="copySelectionBtn"');
 const smartObjectButtonPosition = index.indexOf('id="smartObjectBtn"');
 const ratioToolbarPosition = index.indexOf('id="ratioPresetBar"');
 const assetsContainerPosition = index.indexOf('class="assets-container"');
+const directoryRowPosition = index.indexOf('class="toolbar-row toolbar-row-directory"');
+const mainToolbarRowPosition = index.indexOf('class="toolbar-row toolbar-row-main"');
 
+assert(directoryRowPosition >= 0, 'directory controls must have their own top toolbar row');
+assert(mainToolbarRowPosition > directoryRowPosition, 'workflow controls must sit below the directory row');
+assert(openFolderButtonPosition > directoryRowPosition && openFolderButtonPosition < mainToolbarRowPosition,
+    'the directory selector and open-folder button must share the dedicated first row');
 assert(archiveButtonPosition > openFolderButtonPosition, 'archive button must follow open-folder button');
 assert(archiveButtonPosition < autoRefreshPosition, 'archive button must precede auto-refresh status');
 assert(refreshButtonPosition > autoRefreshPosition, 'manual refresh icon must follow auto-refresh status');
@@ -138,24 +148,29 @@ assert(
     index.slice(refreshButtonPosition, settingsButtonPosition).includes('</button>'),
     'manual refresh icon must be immediately before the settings gear'
 );
-assert(index.includes('id="openFolderBtn" class="btn toolbar-command toolbar-command-open"'));
-assert(index.includes('class="toolbar-button-label">打开目录</span>'));
+assert(index.includes('id="directoryMenuBtn"'), 'toolbar must expose the current-directory menu trigger');
+assert(index.includes('id="directoryCurrentName"'), 'toolbar must show the active directory name');
+assert(index.includes('id="directoryMenu"'), 'toolbar must provide the directory history menu');
+assert(index.includes('id="directoryHistoryList"'), 'directory menu must render recent locations');
+assert(index.includes('id="directoryChooseBtn"'), 'directory menu must offer a choose-directory action');
+assert(index.includes('id="directoryUseBrowserDownloadsBtn"'), 'directory menu must offer browser download detection');
+assert(index.includes('id="directoryBrowserStatus"'), 'directory menu must show browser directory detection status');
+assert(index.includes('id="openFolderBtn" class="btn icon-button directory-open-button"'));
+assert(index.includes('aria-label="打开当前素材目录"'), 'separate folder button must open the active directory');
+assert(index.includes('历史位置'), 'directory menu must label its history section');
 assert(index.includes('class="toolbar-status-dot"'), 'auto monitoring must use the compact cyan status dot');
 assert(index.includes('id="refreshBtn"'), 'manual scan must use a dedicated refresh icon');
 assert(index.includes('aria-label="重新扫描素材"'), 'manual refresh icon needs an accessible label');
 assert(!index.includes('id="scanFolderBtn"'), 'the old scan-folder button identity must be removed');
 assert(!index.includes('id="assetsDir"'), 'asset directory must not occupy the main toolbar');
-assert(!index.includes('id="browseDirBtn"'), 'directory browsing must move into settings');
-assert(!index.includes('id="openAssetsDirBtn"'), 'directory opening must move into settings');
+assert(!index.includes('id="browseDirBtn"'), 'legacy directory browsing control must be removed');
+assert(!index.includes('id="openAssetsDirBtn"'), 'legacy directory open control must be removed');
 assert(index.includes('id="settingsOverlay"'), 'settings must use an in-panel modal overlay');
-assert(index.includes('id="settingsAssetsDir"'), 'settings must contain the asset directory field');
-assert(index.includes('id="settingsBrowseDirBtn"'), 'settings must allow selecting an asset directory');
-assert(index.includes('id="settingsOpenAssetsDirBtn"'), 'settings must allow opening the selected asset directory');
-assert(
-    index.includes('id="settingsUseBrowserDownloadsBtn"'),
-    'settings must offer automatic browser download directory detection'
-);
-assert(index.includes('id="browserDownloadStatus"'), 'settings must show the browser directory detection result');
+assert(!index.includes('id="settingsAssetsDir"'), 'settings must not duplicate the asset directory field');
+assert(!index.includes('id="settingsBrowseDirBtn"'), 'settings must not duplicate directory selection');
+assert(!index.includes('id="settingsOpenAssetsDirBtn"'), 'settings must not duplicate directory opening');
+assert(!index.includes('id="settingsUseBrowserDownloadsBtn"'), 'browser directory detection must move into the directory menu');
+assert(!index.includes('<h3>素材目录</h3>'), 'the workflow settings panel must not contain an asset directory section');
 assert(index.includes('id="settingsClipboardMaxEdge"'), 'settings must expose clipboard maximum edge resolution');
 assert(index.includes('value="2560"'), 'clipboard optimization must default to 2560 pixels');
 assert(index.includes('aria-label="打开设置"'), 'settings gear needs an accessible label');
@@ -197,8 +212,16 @@ assert(style.includes('.settings-overlay'), 'settings modal overlay styling must
 assert(style.includes('.settings-dialog'), 'settings dialog styling must exist');
 assert(style.includes('.btn-settings'), 'compact gear button styling must exist');
 assert(style.includes('.btn-refresh'), 'manual refresh icon styling must exist');
+assert(style.includes('.directory-picker'), 'current-directory picker styling must exist');
+assert(style.includes('.directory-menu'), 'directory history popup styling must exist');
+assert(style.includes('.directory-history-item.is-current'), 'current directory must have a selected visual state');
+assert(
+    /\.toolbar\s*\{[^}]*position:\s*relative;[^}]*z-index:\s*100;/s.test(style),
+    'toolbar stacking context must keep the directory popup above the asset browser'
+);
 assert(
     /\.toolbar\s*\{[^}]*padding:\s*4px;/s.test(style) &&
+        /\.toolbar-row-directory\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s+36px;/s.test(style) &&
         /\.toolbar-row-main\s*\{[^}]*min-height:\s*36px;/s.test(style) &&
         /\.toolbar-command\s*\{[^}]*height:\s*36px;/s.test(style),
     'the top toolbar must use the compact 36px control height'
@@ -206,6 +229,18 @@ assert(
 assert(
     /\.icon-button\s*\{[^}]*width:\s*36px;[^}]*height:\s*36px;/s.test(style),
     'top icon buttons must shrink with the compact toolbar'
+);
+assert(
+    /\.btn-archive\s*\{[^}]*background:\s*linear-gradient\(180deg,\s*rgba\(255,\s*255,\s*255,\s*0\.052\),\s*rgba\(255,\s*255,\s*255,\s*0\.014\)\);[^}]*border-color:\s*#35464e;[^}]*box-shadow:/s.test(style),
+    'archive action must use the approved subtle raised button surface'
+);
+assert(
+    /\.btn-archive \.toolbar-icon\s*\{[^}]*color:\s*#8adfe5;/s.test(style),
+    'archive icon must use the approved low-saturation cyan emphasis'
+);
+assert(
+    /\.btn-archive:hover\s*\{[^}]*border-color:\s*#465b64;/s.test(style),
+    'archive action must have a restrained hover boundary'
 );
 assert(style.includes('.ratio-preset-bar'), 'ratio toolbar styling must exist');
 assert(style.includes('.ratio-more-menu'), 'ratio overflow menu styling must exist');
@@ -312,10 +347,23 @@ assert(main.includes("const childProcess = require('child_process')"), 'Explorer
 assert(main.includes("settingsBtn: document.getElementById('settingsBtn')"));
 assert(main.includes("openFolderBtn: document.getElementById('openFolderBtn')"));
 assert(main.includes("refreshBtn: document.getElementById('refreshBtn')"));
-assert(main.includes("settingsAssetsDir: document.getElementById('settingsAssetsDir')"));
+assert(!main.includes("settingsAssetsDir: document.getElementById('settingsAssetsDir')"));
 assert(main.includes("const BrowserDownloadUtils = window.HbirdBridgeBrowserDownloadUtils"));
-assert(main.includes("settingsUseBrowserDownloadsBtn: document.getElementById('settingsUseBrowserDownloadsBtn')"));
-assert(main.includes("browserDownloadStatus: document.getElementById('browserDownloadStatus')"));
+assert(main.includes("const DirectoryHistoryUtils = window.HbirdBridgeDirectoryHistoryUtils"));
+assert(main.includes('recentAssetsDirs: []'), 'configuration must track recent asset directories');
+assert(main.includes('recentAssetsDirs: CONFIG.recentAssetsDirs'), 'directory history must persist in settings');
+assert(main.includes("directoryMenuBtn: document.getElementById('directoryMenuBtn')"));
+assert(main.includes("directoryChooseBtn: document.getElementById('directoryChooseBtn')"));
+assert(main.includes("directoryHistoryList: document.getElementById('directoryHistoryList')"));
+assert(main.includes("elements.directoryMenuBtn.addEventListener('click', toggleDirectoryMenu)"));
+assert(main.includes("elements.directoryChooseBtn.addEventListener('click', chooseAssetsDirectory)"));
+assert(main.includes("elements.directoryHistoryList.addEventListener('click', handleDirectoryHistoryClick)"));
+assert(main.includes('function activateAssetsDirectory(directoryPath)'), 'directory switches need one atomic controller');
+assert(main.includes('function renderDirectoryMenu()'), 'directory history menu must be rendered from persisted state');
+assert(main.includes('DirectoryHistoryUtils.buildDirectoryHistory'), 'history must be deduplicated and bounded');
+assert(main.includes('loadAssets();') && main.includes('startAutoRefresh();'), 'directory switching must reload and monitor assets');
+assert(main.includes("directoryUseBrowserDownloadsBtn: document.getElementById('directoryUseBrowserDownloadsBtn')"));
+assert(main.includes("directoryBrowserStatus: document.getElementById('directoryBrowserStatus')"));
 assert(main.includes("settingsClipboardMaxEdge: document.getElementById('settingsClipboardMaxEdge')"));
 assert(main.includes("elements.settingsBtn.addEventListener('click', openSettings)"));
 assert(
@@ -327,11 +375,10 @@ assert(
     'refresh icon must own the original manual scan action'
 );
 assert(main.includes("elements.saveSettingsBtn.addEventListener('click', applySettings)"));
-assert(main.includes("elements.settingsBrowseDirBtn.addEventListener('click', browseDir)"));
 assert(
-    main.includes("elements.settingsUseBrowserDownloadsBtn.addEventListener('click', useBrowserDownloadDirectory)")
+    main.includes("elements.directoryUseBrowserDownloadsBtn.addEventListener('click', useBrowserDownloadDirectory)")
 );
-assert(main.includes("elements.settingsOpenAssetsDirBtn.addEventListener('click'"));
+assert(!main.includes('function browseDir()'), 'directory selection must have a single controller outside settings');
 assert(main.includes("elements.archiveBtn.addEventListener('click', archiveOldImages)"));
 assert(main.includes("smartObjectBtn: document.getElementById('smartObjectBtn')"));
 assert(main.includes("copySelectionBtn: document.getElementById('copySelectionBtn')"));
@@ -402,7 +449,22 @@ assert(
     main.includes('const explorerDirectory = path.win32.normalize(directoryPath || CONFIG.assetsDir);'),
     'CEP forward-slash paths must be normalized before launching Explorer'
 );
-assert(main.includes("childProcess.execFile('explorer.exe', [explorerDirectory]"));
+const openDirectoryStart = main.indexOf('function openAssetsDirectory(directoryPath)');
+const openDirectoryEnd = main.indexOf('// ==================== 素材加载', openDirectoryStart);
+const openDirectoryFunction = main.slice(openDirectoryStart, openDirectoryEnd);
+assert(openDirectoryStart >= 0 && openDirectoryEnd > openDirectoryStart, 'open-directory function must be discoverable');
+assert(
+    openDirectoryFunction.includes("childProcess.execFile('explorer.exe', [explorerDirectory], error =>"),
+    'Explorer must retain the CEP-compatible launch path that visibly opens the directory'
+);
+assert(
+    openDirectoryFunction.includes("typeof error.code === 'number'"),
+    'numeric Explorer exit codes must be treated as delegated shell results rather than launch failures'
+);
+assert(
+    !openDirectoryFunction.includes("childProcess.spawn('explorer.exe'"),
+    'the detached hidden launch that fails to show Explorer in CEP must not be used'
+);
 assert(
     !main.includes("childProcess.execFile('explorer.exe', [CONFIG.assetsDir]"),
     'Explorer must never receive the raw CEP path'
@@ -449,7 +511,11 @@ assert(
 );
 assert(
     main.includes('function setBrowserDirectoryDetectionBusy(busy)'),
-    'browser detection must lock conflicting settings actions'
+    'browser detection must lock conflicting directory actions'
+);
+assert(
+    /function useBrowserDownloadDirectory\(\)[\s\S]*?activateAssetsDirectory\(result\.directory\)/.test(main),
+    'browser detection must immediately activate the detected directory'
 );
 assert(
     main.includes("? 'read-error'") &&

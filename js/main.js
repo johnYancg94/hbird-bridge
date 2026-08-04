@@ -1,6 +1,6 @@
 /**
  * Hbird Bridge - 主逻辑
- * 版本 1.9.6 - 快速矩形选区按钮高度微调
+ * 版本 1.11.1 - 一键归档按钮层次优化
  */
 
 (function() {
@@ -9,6 +9,7 @@
     // ==================== 配置 ====================
     const CONFIG = {
         assetsDir: '',
+        recentAssetsDirs: [],
         clipboardMaxEdge: 2560,
         supportedImages: ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.tiff', '.tif', '.psd'],
         autoRefreshInterval: 5000,
@@ -40,6 +41,10 @@
     const MarqueeRatioUtils = window.HbirdBridgeMarqueeRatioUtils;
     if (!MarqueeRatioUtils) {
         throw new Error('marquee-ratio-utils.js 未正确加载');
+    }
+    const DirectoryHistoryUtils = window.HbirdBridgeDirectoryHistoryUtils;
+    if (!DirectoryHistoryUtils) {
+        throw new Error('directory-history-utils.js 未正确加载');
     }
 
     const supportedImageSet = new Set(CONFIG.supportedImages);
@@ -78,12 +83,16 @@
             closeSettingsBtn: document.getElementById('closeSettingsBtn'),
             cancelSettingsBtn: document.getElementById('cancelSettingsBtn'),
             saveSettingsBtn: document.getElementById('saveSettingsBtn'),
-            settingsAssetsDir: document.getElementById('settingsAssetsDir'),
-            settingsBrowseDirBtn: document.getElementById('settingsBrowseDirBtn'),
-            settingsOpenAssetsDirBtn: document.getElementById('settingsOpenAssetsDirBtn'),
-            settingsUseBrowserDownloadsBtn: document.getElementById('settingsUseBrowserDownloadsBtn'),
-            browserDownloadStatus: document.getElementById('browserDownloadStatus'),
             settingsClipboardMaxEdge: document.getElementById('settingsClipboardMaxEdge'),
+            directoryPicker: document.querySelector('.directory-picker'),
+            directoryMenuBtn: document.getElementById('directoryMenuBtn'),
+            directoryCurrentName: document.getElementById('directoryCurrentName'),
+            directoryMenu: document.getElementById('directoryMenu'),
+            directoryHistoryList: document.getElementById('directoryHistoryList'),
+            directoryChooseBtn: document.getElementById('directoryChooseBtn'),
+            directoryUseBrowserDownloadsBtn: document.getElementById('directoryUseBrowserDownloadsBtn'),
+            directoryBrowserButtonLabel: document.getElementById('directoryBrowserButtonLabel'),
+            directoryBrowserStatus: document.getElementById('directoryBrowserStatus'),
             openFolderBtn: document.getElementById('openFolderBtn'),
             refreshBtn: document.getElementById('refreshBtn'),
             archiveBtn: document.getElementById('archiveBtn'),
@@ -103,17 +112,16 @@
         };
 
         // 固定控件事件
+        elements.directoryMenuBtn.addEventListener('click', toggleDirectoryMenu);
+        elements.directoryChooseBtn.addEventListener('click', chooseAssetsDirectory);
+        elements.directoryUseBrowserDownloadsBtn.addEventListener('click', useBrowserDownloadDirectory);
+        elements.directoryHistoryList.addEventListener('click', handleDirectoryHistoryClick);
         elements.openFolderBtn.addEventListener('click', () => openAssetsDirectory(CONFIG.assetsDir));
         elements.refreshBtn.addEventListener('click', scanFolder);
         elements.settingsBtn.addEventListener('click', openSettings);
         elements.closeSettingsBtn.addEventListener('click', closeSettings);
         elements.cancelSettingsBtn.addEventListener('click', closeSettings);
         elements.saveSettingsBtn.addEventListener('click', applySettings);
-        elements.settingsBrowseDirBtn.addEventListener('click', browseDir);
-        elements.settingsUseBrowserDownloadsBtn.addEventListener('click', useBrowserDownloadDirectory);
-        elements.settingsOpenAssetsDirBtn.addEventListener('click', () => {
-            openAssetsDirectory(elements.settingsAssetsDir.value);
-        });
         elements.settingsOverlay.addEventListener('click', event => {
             if (event.target === elements.settingsOverlay) {
                 closeSettings();
@@ -122,6 +130,7 @@
         elements.archiveBtn.addEventListener('click', archiveOldImages);
         elements.ratioPresetBar.addEventListener('click', handleRatioPresetClick);
         elements.ratioMoreBtn.addEventListener('click', toggleRatioMenu);
+        document.addEventListener('click', handleDirectoryMenuOutsideClick);
         document.addEventListener('click', handleRatioMenuOutsideClick);
         elements.deleteBtn.addEventListener('click', deleteSelectedAssets);
         elements.openNewBtn.addEventListener('click', () => importToPS('open'));
@@ -135,7 +144,9 @@
 
         setupThumbnailVisibility();
         loadSettings();
+        normalizeDirectoryHistory();
         syncSettingsFields();
+        renderDirectoryMenu();
         loadAssets();
         startAutoRefresh();
     }
@@ -300,6 +311,7 @@
     const LEGACY_SETTINGS_FILENAME = 'Qiaodoumayijiang_settings.json';
     const MIN_CLIPBOARD_MAX_EDGE = 256;
     const MAX_CLIPBOARD_MAX_EDGE = 16384;
+    const MAX_RECENT_ASSET_DIRECTORIES = 3;
 
     function getSettingsPath(fileName) {
         return path.join(os.homedir(), fileName);
@@ -318,6 +330,9 @@
                 const settings = JSON.parse(fs.readFileSync(candidate.path, 'utf8'));
                 if (settings.assetsDir && fs.existsSync(settings.assetsDir)) {
                     CONFIG.assetsDir = settings.assetsDir;
+                }
+                if (Array.isArray(settings.recentAssetsDirs)) {
+                    CONFIG.recentAssetsDirs = settings.recentAssetsDirs;
                 }
 
                 const savedMaxEdge = Number(settings.clipboardMaxEdge);
@@ -344,6 +359,7 @@
             const settingsPath = getSettingsPath(SETTINGS_FILENAME);
             fs.writeFileSync(settingsPath, JSON.stringify({
                 assetsDir: CONFIG.assetsDir,
+                recentAssetsDirs: CONFIG.recentAssetsDirs,
                 clipboardMaxEdge: CONFIG.clipboardMaxEdge
             }, null, 2), 'utf8');
             return true;
@@ -363,15 +379,176 @@
         return Math.max(MIN_CLIPBOARD_MAX_EDGE, Math.min(MAX_CLIPBOARD_MAX_EDGE, rounded));
     }
 
+    function normalizeDirectoryHistory() {
+        const currentDirectory = path.win32.normalize(CONFIG.assetsDir);
+        const currentKey = currentDirectory.toLowerCase();
+        CONFIG.recentAssetsDirs = DirectoryHistoryUtils.buildDirectoryHistory(
+            currentDirectory,
+            CONFIG.recentAssetsDirs,
+            MAX_RECENT_ASSET_DIRECTORIES
+        ).filter(directoryPath => {
+            return directoryPath.toLowerCase() === currentKey || fs.existsSync(directoryPath);
+        });
+    }
+
+    function renderDirectoryMenu() {
+        if (!elements.directoryCurrentName || !elements.directoryHistoryList) return;
+
+        normalizeDirectoryHistory();
+        const currentDirectory = path.win32.normalize(CONFIG.assetsDir);
+        const currentKey = currentDirectory.toLowerCase();
+        const currentName = DirectoryHistoryUtils.getDirectoryDisplayName(currentDirectory);
+
+        elements.directoryCurrentName.textContent = currentName;
+        elements.directoryMenuBtn.title = `当前素材目录：${currentDirectory}`;
+        elements.directoryHistoryList.textContent = '';
+
+        if (CONFIG.recentAssetsDirs.length === 0) {
+            const emptyState = document.createElement('p');
+            emptyState.className = 'directory-history-empty';
+            emptyState.textContent = '暂无历史目录';
+            elements.directoryHistoryList.appendChild(emptyState);
+            return;
+        }
+
+        CONFIG.recentAssetsDirs.forEach(directoryPath => {
+            const normalizedPath = path.win32.normalize(directoryPath);
+            const isCurrent = normalizedPath.toLowerCase() === currentKey;
+            const item = document.createElement('button');
+            item.type = 'button';
+            item.className = 'directory-history-item' + (isCurrent ? ' is-current' : '');
+            item.dataset.directoryPath = normalizedPath;
+            item.setAttribute('role', 'menuitemradio');
+            item.setAttribute('aria-checked', isCurrent ? 'true' : 'false');
+            item.title = normalizedPath;
+            item.innerHTML = [
+                '<svg class="directory-menu-icon" aria-hidden="true"><use xlink:href="#icon-folder"></use></svg>',
+                '<span class="directory-item-copy">',
+                '<span class="directory-item-name"></span>',
+                '<span class="directory-item-path"></span>',
+                '</span>',
+                '<span class="directory-item-check" aria-hidden="true"></span>'
+            ].join('');
+            item.querySelector('.directory-item-name').textContent =
+                DirectoryHistoryUtils.getDirectoryDisplayName(normalizedPath);
+            item.querySelector('.directory-item-path').textContent = normalizedPath;
+            item.querySelector('.directory-item-check').textContent = isCurrent ? '✓' : '';
+            elements.directoryHistoryList.appendChild(item);
+        });
+    }
+
+    function closeDirectoryMenu() {
+        if (!elements.directoryMenu || !elements.directoryMenuBtn) return;
+        elements.directoryMenu.classList.add('is-hidden');
+        elements.directoryMenuBtn.setAttribute('aria-expanded', 'false');
+    }
+
+    function toggleDirectoryMenu(event) {
+        if (event) event.stopPropagation();
+        const willOpen = elements.directoryMenu.classList.contains('is-hidden');
+        closeRatioMenu();
+        if (willOpen) {
+            renderDirectoryMenu();
+            elements.directoryMenu.classList.remove('is-hidden');
+            elements.directoryMenuBtn.setAttribute('aria-expanded', 'true');
+        } else {
+            closeDirectoryMenu();
+        }
+    }
+
+    function handleDirectoryMenuOutsideClick(event) {
+        if (!elements.directoryPicker || elements.directoryMenu.classList.contains('is-hidden')) return;
+        if (!elements.directoryPicker.contains(event.target)) {
+            closeDirectoryMenu();
+        }
+    }
+
+    function chooseAssetsDirectory() {
+        if (archiveInProgress) {
+            setStatus('归档期间不能切换素材目录');
+            return;
+        }
+
+        closeDirectoryMenu();
+        const result = window.cep.fs.showOpenDialogEx(
+            false,
+            true,
+            '选择素材目录',
+            CONFIG.assetsDir,
+            null
+        );
+        if (result.data && result.data.length > 0) {
+            activateAssetsDirectory(result.data[0]);
+        }
+    }
+
+    function handleDirectoryHistoryClick(event) {
+        const item = event.target.closest('.directory-history-item');
+        if (!item || !elements.directoryHistoryList.contains(item)) return;
+        activateAssetsDirectory(item.dataset.directoryPath);
+    }
+
+    function activateAssetsDirectory(directoryPath) {
+        if (archiveInProgress) {
+            setStatus('归档期间不能切换素材目录');
+            return false;
+        }
+
+        const rawDirectory = String(directoryPath || '').trim();
+        const nextDirectory = rawDirectory ? path.win32.normalize(rawDirectory) : '';
+        if (!nextDirectory || !fs.existsSync(nextDirectory)) {
+            CONFIG.recentAssetsDirs = CONFIG.recentAssetsDirs.filter(item => {
+                return path.win32.normalize(item).toLowerCase() !== nextDirectory.toLowerCase();
+            });
+            saveSettings();
+            renderDirectoryMenu();
+            alert('该素材目录不存在或无法访问');
+            setStatus('素材目录切换失败');
+            return false;
+        }
+
+        const previousDirectory = CONFIG.assetsDir;
+        const previousHistory = CONFIG.recentAssetsDirs.slice();
+        const directoryChanged = path.win32.normalize(previousDirectory).toLowerCase() !==
+            nextDirectory.toLowerCase();
+
+        CONFIG.assetsDir = nextDirectory;
+        CONFIG.recentAssetsDirs = DirectoryHistoryUtils.buildDirectoryHistory(
+            nextDirectory,
+            previousHistory,
+            MAX_RECENT_ASSET_DIRECTORIES
+        );
+
+        if (!saveSettings()) {
+            CONFIG.assetsDir = previousDirectory;
+            CONFIG.recentAssetsDirs = previousHistory;
+            renderDirectoryMenu();
+            alert('素材目录保存失败，请检查文件权限或磁盘状态后重试');
+            setStatus('素材目录切换失败');
+            return false;
+        }
+
+        syncSettingsFields();
+        renderDirectoryMenu();
+        closeDirectoryMenu();
+
+        if (directoryChanged) {
+            lastSnapshot = '';
+            loadAssets();
+            startAutoRefresh();
+        } else {
+            setStatus(`当前素材目录：${DirectoryHistoryUtils.getDirectoryDisplayName(nextDirectory)}`);
+        }
+        return true;
+    }
+
     function syncSettingsFields() {
-        if (!elements.settingsAssetsDir || !elements.settingsClipboardMaxEdge) return;
-        elements.settingsAssetsDir.value = CONFIG.assetsDir;
+        if (!elements.settingsClipboardMaxEdge) return;
         elements.settingsClipboardMaxEdge.value = String(CONFIG.clipboardMaxEdge);
     }
 
     function openSettings() {
         syncSettingsFields();
-        setBrowserDownloadStatus('自动读取 Windows 默认浏览器的下载设置。', '');
         elements.settingsOverlay.classList.remove('is-hidden');
         elements.settingsOverlay.setAttribute('aria-hidden', 'false');
         setTimeout(() => elements.settingsClipboardMaxEdge.focus(), 0);
@@ -379,13 +556,13 @@
 
     function closeSettings() {
         if (!elements.settingsOverlay) return;
-        if (browserDirectoryDetectionInProgress) return;
         elements.settingsOverlay.classList.add('is-hidden');
         elements.settingsOverlay.setAttribute('aria-hidden', 'true');
     }
 
     function handleSettingsKeyDown(event) {
         if (event.key === 'Escape') {
+            closeDirectoryMenu();
             closeRatioMenu();
         }
         if (event.key === 'Escape' &&
@@ -395,21 +572,13 @@
         }
     }
 
-    function browseDir() {
-        const currentDirectory = elements.settingsAssetsDir.value || CONFIG.assetsDir;
-        const result = window.cep.fs.showOpenDialogEx(false, true, '选择素材目录', currentDirectory, null);
-        if (result.data && result.data.length > 0) {
-            elements.settingsAssetsDir.value = result.data[0];
-        }
-    }
-
-    function setBrowserDownloadStatus(message, tone) {
-        if (!elements.browserDownloadStatus) return;
-        elements.browserDownloadStatus.textContent = message;
+    function setDirectoryBrowserStatus(message, tone) {
+        if (!elements.directoryBrowserStatus) return;
+        elements.directoryBrowserStatus.textContent = message;
         if (tone) {
-            elements.browserDownloadStatus.setAttribute('data-tone', tone);
+            elements.directoryBrowserStatus.setAttribute('data-tone', tone);
         } else {
-            elements.browserDownloadStatus.removeAttribute('data-tone');
+            elements.directoryBrowserStatus.removeAttribute('data-tone');
         }
     }
 
@@ -417,19 +586,20 @@
         browserDirectoryDetectionInProgress = busy;
         const locked = busy || archiveInProgress;
         const controls = [
-            elements.settingsUseBrowserDownloadsBtn,
-            elements.settingsBrowseDirBtn,
-            elements.settingsOpenAssetsDirBtn,
-            elements.saveSettingsBtn,
-            elements.cancelSettingsBtn,
-            elements.closeSettingsBtn
+            elements.directoryMenuBtn,
+            elements.directoryChooseBtn,
+            elements.directoryUseBrowserDownloadsBtn,
+            elements.openFolderBtn,
+            elements.settingsBtn
         ];
         controls.forEach(control => {
             if (control) control.disabled = locked;
         });
-        elements.settingsUseBrowserDownloadsBtn.textContent = busy
-            ? '正在检测...'
-            : '🌐 使用浏览器下载目录';
+        if (elements.directoryBrowserButtonLabel) {
+            elements.directoryBrowserButtonLabel.textContent = busy
+                ? '正在检测...'
+                : '使用浏览器下载目录';
+        }
     }
 
     function queryRegistryString(keyPath, valueName) {
@@ -848,29 +1018,33 @@ if ($null -eq $value) {
         if (browserDirectoryDetectionInProgress) return;
 
         setBrowserDirectoryDetectionBusy(true);
-        setBrowserDownloadStatus('正在读取默认浏览器配置...', '');
+        setDirectoryBrowserStatus('正在读取默认浏览器配置...', '');
 
         function finishBrowserDirectoryDetection() {
             setBrowserDirectoryDetectionBusy(false);
         }
 
         resolveBrowserDownloadDirectory().then(result => {
-            elements.settingsAssetsDir.value = result.directory;
             let sourceLabel = '浏览器下载目录';
             if (result.source === 'windows' && result.fallbackReason === 'read-error') {
                 sourceLabel = `配置读取失败，已回退 Windows 下载目录：${result.fallbackDetail}`;
             } else if (result.source === 'windows') {
                 sourceLabel = '未设置自定义路径，使用 Windows 下载目录';
             }
-            setBrowserDownloadStatus(
-                `已识别 ${result.browserName} · ${sourceLabel}`,
-                'success'
-            );
-            setStatus('已填入浏览器下载目录，保存设置后生效');
             finishBrowserDirectoryDetection();
+            const activated = activateAssetsDirectory(result.directory);
+            if (activated) {
+                setDirectoryBrowserStatus(
+                    `已切换到 ${result.browserName} · ${sourceLabel}`,
+                    'success'
+                );
+                setStatus(`已切换到 ${result.browserName} 下载目录`);
+            } else {
+                setDirectoryBrowserStatus('目录识别成功，但切换失败，请手动选择。', 'error');
+            }
         }, error => {
             console.log('识别浏览器下载目录失败:', error);
-            setBrowserDownloadStatus(
+            setDirectoryBrowserStatus(
                 '识别失败，请使用“选择目录”手动指定。',
                 'error'
             );
@@ -890,13 +1064,8 @@ if ($null -eq $value) {
             return;
         }
 
-        const nextAssetsDir = path.win32.normalize(elements.settingsAssetsDir.value.trim());
         const rawMaxEdge = Number(elements.settingsClipboardMaxEdge.value);
 
-        if (!nextAssetsDir || !fs.existsSync(nextAssetsDir)) {
-            alert('请选择有效的素材目录');
-            return;
-        }
         if (!Number.isFinite(rawMaxEdge) ||
             rawMaxEdge < MIN_CLIPBOARD_MAX_EDGE ||
             rawMaxEdge > MAX_CLIPBOARD_MAX_EDGE) {
@@ -905,13 +1074,9 @@ if ($null -eq $value) {
             return;
         }
 
-        const assetsDirectoryChanged = path.win32.normalize(CONFIG.assetsDir) !== nextAssetsDir;
-        const previousAssetsDir = CONFIG.assetsDir;
         const previousClipboardMaxEdge = CONFIG.clipboardMaxEdge;
-        CONFIG.assetsDir = nextAssetsDir;
         CONFIG.clipboardMaxEdge = normalizeClipboardMaxEdge(rawMaxEdge);
         if (!saveSettings()) {
-            CONFIG.assetsDir = previousAssetsDir;
             CONFIG.clipboardMaxEdge = previousClipboardMaxEdge;
             syncSettingsFields();
             alert('设置保存失败，请检查文件权限或磁盘状态后重试');
@@ -920,12 +1085,6 @@ if ($null -eq $value) {
         }
         syncSettingsFields();
         closeSettings();
-
-        if (assetsDirectoryChanged) {
-            lastSnapshot = '';
-            loadAssets();
-            startAutoRefresh();
-        }
         setStatus(`设置已保存 · 拷贝最长边 ${CONFIG.clipboardMaxEdge}px`);
     }
 
@@ -938,10 +1097,15 @@ if ($null -eq $value) {
         }
 
         childProcess.execFile('explorer.exe', [explorerDirectory], error => {
-            if (error) {
-                console.log('打开素材目录失败:', error);
-                setStatus('打开素材目录失败');
+            if (!error) return;
+
+            if (typeof error.code === 'number') {
+                console.log('资源管理器已接收目录请求，退出码:', error.code);
+                return;
             }
+
+            console.log('打开素材目录失败:', error);
+            setStatus('打开素材目录失败');
         });
         setStatus('已打开当前素材目录');
     }
@@ -1670,9 +1834,10 @@ if ($null -eq $value) {
 
     function setArchiveBusy(busy) {
         const controls = [
+            elements.directoryMenuBtn,
+            elements.directoryChooseBtn,
+            elements.directoryUseBrowserDownloadsBtn,
             elements.settingsBtn,
-            elements.settingsBrowseDirBtn,
-            elements.settingsUseBrowserDownloadsBtn,
             elements.saveSettingsBtn,
             elements.openFolderBtn,
             elements.refreshBtn,

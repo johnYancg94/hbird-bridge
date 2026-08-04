@@ -17,3 +17,9 @@ Desktop.ini
 # Local backup/export directories
 feature-backups/
 rebrand-backups/
+
+# Local agent and visual preview artifacts
+docs/superpowers/
+output/
+.agents/
+.codex/

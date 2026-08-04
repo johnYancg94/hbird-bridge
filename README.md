@@ -2,12 +2,16 @@
 
 Hbird Bridge 是一个 Windows 平台的 Photoshop CEP 素材联动面板，用于快速浏览本地图片、导入图层、替换智能对象和整理素材目录。
 
+> 当前为 `v1.11.1-pre.1` 预发布版本。自动化测试已通过，正式发布前仍需完成 Photoshop 实机工作流验证。
+
 ## 主要功能
 
 - 异步扫描素材目录，支持大量图片的懒加载缩略图。
-- 通过齿轮设置素材目录，并自动监听新图片。
-- 可自动读取 Windows 默认浏览器的下载目录，支持夸克、Zen、Edge、Chrome、Brave、Vivaldi、Opera 和 Firefox。
-- 主工具栏可直接打开当前素材目录，并通过循环图标手动刷新素材。
+- 通过顶部独立目录栏切换素材目录，并自动监听新图片。
+- 目录菜单可自动读取并立即切换到 Windows 默认浏览器的下载目录，支持夸克、Zen、Edge、Chrome、Brave、Vivaldi、Opera 和 Firefox。
+- 第二行工具栏集中放置一键归档、监听状态、手动刷新和设置。
+- 顶部目录选择器参考 Cutterman：显示当前目录、保留最近 3 个历史位置，并提供独立的打开目录按钮。
+- 打开素材目录保留 CEP 兼容的 Explorer 启动方式，并忽略成功转交请求后的数字退出码，避免打开成功却显示失败。
 - 面板支持独立调整宽度和高度；宽面板会自动扩展素材列数。
 - 顶部工具栏采用紧凑高度；删除和新建文档操作使用纯图标按钮，并在悬停或键盘聚焦时显示说明。
 - 两排主要操作按钮压缩为原高度的 70%，减少固定操作区占用。
@@ -46,11 +50,22 @@ Hbird Bridge 是一个 Windows 平台的 Photoshop CEP 素材联动面板，用�
 ```powershell
 node --check js/main.js
 node --check js/marquee-ratio-utils.js
+node --check js/directory-history-utils.js
 node tests/marquee-ratio-utils.test.js
+node tests/directory-history-utils.test.js
 node tests/asset-utils.test.js
 node tests/browser-download-utils.test.js
 node tests/copy-selection.test.js
 node tests/integration.test.js
 ```
 
-当前版本：`1.9.6`
+## 仓库结构
+
+- `CSXS/`、`css/`、`js/`、`index.html`：插件运行文件。
+- `一键安装.bat`、`安装说明.txt`：Windows 安装与使用说明。
+- `tests/`：插件回归测试，不会被安装脚本复制到 Photoshop 扩展目录。
+- `.debug`：CEP 本地调试配置。
+
+当前插件版本：`1.11.1`
+
+当前预发布标识：`v1.11.1-pre.1`
