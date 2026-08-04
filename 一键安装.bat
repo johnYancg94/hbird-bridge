@@ -39,7 +39,7 @@ if exist "%TARGET_FOLDER%" (
 )
 
 :: 使用 robocopy 复制文件
-robocopy "%SOURCE_FOLDER%" "%TARGET_FOLDER%" /E /XD "docs" "tests" /XF "一键安装.bat" "安装说明.txt" "*.bak*" >nul 2>&1
+robocopy "%SOURCE_FOLDER%" "%TARGET_FOLDER%" /E /XD "docs" "tests" "scripts" ".github" /XF "一键安装.bat" "安装说明.txt" "README.md" "CHANGELOG.md" ".debug" ".gitignore" "*.bak*" >nul 2>&1
 if errorlevel 8 (
     echo      安装失败：复制扩展文件时发生错误
     pause

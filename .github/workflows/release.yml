@@ -1,0 +1,51 @@
+name: Publish Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    if: ${{ !contains(github.ref_name, '-') }}
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Validate plugin
+        shell: pwsh
+        run: |
+          node --check js\directory-history-utils.js
+          node --check js\marquee-ratio-utils.js
+          node --check js\main.js
+          node tests\directory-history-utils.test.js
+          node tests\marquee-ratio-utils.test.js
+          node tests\asset-utils.test.js
+          node tests\browser-download-utils.test.js
+          node tests\copy-selection.test.js
+          node tests\integration.test.js
+
+      - name: Build release package
+        shell: pwsh
+        run: |
+          $version = $env:GITHUB_REF_NAME.TrimStart('v')
+          .\scripts\package-release.ps1 -Version $version
+
+      - name: Create GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $archive = "dist\Hbird-Bridge-$env:GITHUB_REF_NAME.zip"
+          $checksum = "$archive.sha256"
+          gh release create $env:GITHUB_REF_NAME $archive $checksum --verify-tag --latest --title "Hbird Bridge $env:GITHUB_REF_NAME" --notes-file CHANGELOG.md

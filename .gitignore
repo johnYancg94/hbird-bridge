@@ -23,3 +23,4 @@ docs/superpowers/
 output/
 .agents/
 .codex/
+dist/

@@ -17,6 +17,9 @@ const debugConfig = fs.readFileSync(path.join(root, '.debug'), 'utf8');
 const installer = fs.readFileSync(path.join(root, '一键安装.bat'), 'utf8');
 const installGuide = fs.readFileSync(path.join(root, '安装说明.txt'), 'utf8');
 const readme = fs.readFileSync(path.join(root, 'README.md'), 'utf8');
+const changelog = fs.readFileSync(path.join(root, 'CHANGELOG.md'), 'utf8');
+const packageScript = fs.readFileSync(path.join(root, 'scripts', 'package-release.ps1'), 'utf8');
+const releaseWorkflow = fs.readFileSync(path.join(root, '.github', 'workflows', 'release.yml'), 'utf8');
 
 const utilsPosition = index.indexOf('js/asset-utils.js');
 const browserUtilsPosition = index.indexOf('js/browser-download-utils.js');
@@ -94,6 +97,10 @@ assert(
 assert(installer.includes('将图片直接放入 %ASSETS_FOLDER% 根目录'), 'installer must preserve root-only image discovery');
 assert(installer.includes('/XD "docs" "tests"'), 'installer must omit development-only directories');
 assert(installer.includes('"*.bak*"'), 'installer must omit backup files');
+assert(
+    installer.includes('"README.md" "CHANGELOG.md"'),
+    'installer must not copy repository documentation into the CEP runtime directory'
+);
 assert(installGuide.includes('Hbird Bridge - 安装与使用说明'), 'install guide must use the Hbird Bridge brand');
 assert(
     installGuide.includes('智能对象导入：替换当前图层并保持原位置，完成后自动栅格化'),
@@ -103,6 +110,23 @@ assert(
     readme.includes('智能对象导入：替换当前图层并保持原位置，完成后自动栅格化目标图层'),
     'README must document smart import rasterization'
 );
+assert(readme.includes('当前稳定版本：`v1.11.1`'), 'README must identify the formal stable release');
+assert(!readme.includes('当前预发布标识'), 'README must not retain prerelease status after formal release');
+assert(changelog.includes('## v1.11.1 — 2026-08-04'), 'changelog must promote v1.11.1 to a formal release');
+assert(!changelog.includes('等待 Photoshop 实机工作流验证'), 'formal release notes must not claim prerelease status');
+assert(
+    packageScript.includes("'CSXS\\manifest.xml'") &&
+        packageScript.includes("'css\\style.css'") &&
+        packageScript.includes("'js\\main.js'") &&
+        packageScript.includes("'index.html'") &&
+        packageScript.includes("'一键安装.bat'"),
+    'release packaging must use an explicit runtime allowlist'
+);
+assert(packageScript.includes('Get-FileHash') && packageScript.includes('.sha256'), 'release packaging must emit a checksum');
+assert(releaseWorkflow.includes("tags:\n      - 'v*'") && releaseWorkflow.includes("!contains(github.ref_name, '-')"),
+    'release workflow must run only for formal version tags');
+assert(releaseWorkflow.includes('node tests\\integration.test.js'), 'release workflow must run integration tests before publishing');
+assert(releaseWorkflow.includes('gh release create'), 'release workflow must create a GitHub Release');
 
 assert(!main.includes('fs.readdirSync('), 'directory reads must not block the CEP UI thread');
 assert(!main.includes('fs.statSync(fullPath)'), 'asset metadata reads must be asynchronous');

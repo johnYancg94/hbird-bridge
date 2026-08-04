@@ -2,7 +2,7 @@
 
 Hbird Bridge 是一个 Windows 平台的 Photoshop CEP 素材联动面板，用于快速浏览本地图片、导入图层、替换智能对象和整理素材目录。
 
-> 当前为 `v1.11.1-pre.1` 预发布版本。自动化测试已通过，正式发布前仍需完成 Photoshop 实机工作流验证。
+> 当前稳定版本：`v1.11.1`
 
 ## 主要功能
 
@@ -31,7 +31,9 @@ Hbird Bridge 是一个 Windows 平台的 Photoshop CEP 素材联动面板，用�
 
 ## 安装
 
-运行 `一键安装.bat`，然后重启 Photoshop。
+推荐从 [GitHub Releases](https://github.com/johnYancg94/hbird-bridge/releases/latest) 下载 `Hbird-Bridge-v1.11.1.zip`，解压后运行 `一键安装.bat`，然后重启 Photoshop。
+
+也可以克隆源码仓库后直接运行根目录中的安装脚本。
 
 安装后的扩展目录：
 
@@ -64,8 +66,8 @@ node tests/integration.test.js
 - `CSXS/`、`css/`、`js/`、`index.html`：插件运行文件。
 - `一键安装.bat`、`安装说明.txt`：Windows 安装与使用说明。
 - `tests/`：插件回归测试，不会被安装脚本复制到 Photoshop 扩展目录。
+- `scripts/package-release.ps1`：生成纯净的正式发布 ZIP 和 SHA-256 校验文件。
+- `.github/workflows/release.yml`：正式版本标签推送后的自动测试与 GitHub Release 流程。
 - `.debug`：CEP 本地调试配置。
 
 当前插件版本：`1.11.1`
-
-当前预发布标识：`v1.11.1-pre.1`
