@@ -1,6 +1,6 @@
 param(
     [ValidatePattern('^[0-9A-Za-z.-]+$')]
-    [string]$Version = '1.11.1',
+    [string]$Version = '1.11.2',
     [string]$OutputDirectory = ''
 )
 

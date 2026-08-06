@@ -1,6 +1,6 @@
 /**
  * Hbird Bridge - 主逻辑
- * 版本 1.11.1 - 一键归档按钮层次优化
+ * 版本 1.11.2 - 修复隐藏图层选区拷贝
  */
 
 (function() {
@@ -2032,9 +2032,32 @@ try {
         const script = `
             (function() {
                 ${extendScriptStringifyHelper}
+
+                function layerExistsById(layerId) {
+                    try {
+                        var layerReference = new ActionReference();
+                        layerReference.putIdentifier(charIDToTypeID("Lyr "), layerId);
+                        executeActionGet(layerReference);
+                        return true;
+                    } catch(layerLookupError) {
+                        return false;
+                    }
+                }
+
+                function deleteLayerWithoutSelecting(layerId) {
+                    var deleteDescriptor = new ActionDescriptor();
+                    var deleteReference = new ActionReference();
+                    deleteReference.putIdentifier(charIDToTypeID("Lyr "), layerId);
+                    deleteDescriptor.putReference(charIDToTypeID("null"), deleteReference);
+                    executeAction(charIDToTypeID("Dlt "), deleteDescriptor, DialogModes.NO);
+                }
+
                 var doc = null;
                 var originalHistoryState = null;
+                var mergeGuardLayer = null;
+                var mergeGuardLayerId = null;
                 var stampLayer = null;
+                var stampLayerId = null;
                 var selectionLayer = null;
                 var tempDocument = null;
                 var exportFile = null;
@@ -2043,6 +2066,7 @@ try {
                 var optimized = false;
                 var outputWidth = 0;
                 var outputHeight = 0;
+                var currentStage = "初始化";
 
                 try {
                     if (app.documents.length === 0) {
@@ -2055,6 +2079,7 @@ try {
                     doc = app.activeDocument;
 
                     try {
+                        currentStage = "读取当前选区";
                         var selectionBounds = doc.selection.bounds;
                         if (!selectionBounds || selectionBounds.length !== 4) {
                             throw new Error("无有效选区");
@@ -2078,13 +2103,29 @@ try {
                         Math.round(selectionBounds[3].as("px") - selectionTop)
                     );
 
+                    currentStage = "新建临时合并辅助图层";
+                    mergeGuardLayer = doc.artLayers.add();
+                    mergeGuardLayerId = mergeGuardLayer.id;
+                    mergeGuardLayer.name = "Hbird Bridge 临时合并辅助";
+                    currentStage = "设置临时合并辅助图层可见";
+                    mergeGuardLayer.visible = true;
+
+                    currentStage = "盖印可见图层";
                     var mergeDescriptor = new ActionDescriptor();
                     mergeDescriptor.putBoolean(charIDToTypeID("Dplc"), true);
                     executeAction(charIDToTypeID("MrgV"), mergeDescriptor, DialogModes.NO);
 
                     stampLayer = doc.activeLayer;
+                    stampLayerId = stampLayer.id;
                     stampLayer.name = "Hbird Bridge 临时盖印";
+                    currentStage = "删除临时合并辅助图层";
+                    if (layerExistsById(mergeGuardLayerId)) {
+                        deleteLayerWithoutSelecting(mergeGuardLayerId);
+                    }
+                    mergeGuardLayer = null;
+                    mergeGuardLayerId = null;
 
+                    currentStage = "从选区创建图层";
                     executeAction(
                         stringIDToTypeID("copyToLayer"),
                         undefined,
@@ -2097,13 +2138,20 @@ try {
                     }
 
                     selectionLayer.name = "选区拷贝";
+                    currentStage = "读取选区拷贝图层边界";
                     var sourceLayerBounds = selectionLayer.bounds;
                     var desiredContentLeft = sourceLayerBounds[0].as("px") - selectionLeft;
                     var desiredContentTop = sourceLayerBounds[1].as("px") - selectionTop;
-                    stampLayer.remove();
+                    currentStage = "删除临时盖印图层";
+                    if (layerExistsById(stampLayerId)) {
+                        deleteLayerWithoutSelecting(stampLayerId);
+                    }
                     stampLayer = null;
+                    stampLayerId = null;
+                    currentStage = "重新激活选区拷贝图层";
                     doc.activeLayer = selectionLayer;
 
+                    currentStage = "创建剪贴板临时文档";
                     tempDocument = app.documents.add(
                         UnitValue(selectionWidth, "px"),
                         UnitValue(selectionHeight, "px"),
@@ -2113,13 +2161,18 @@ try {
                         DocumentFill.TRANSPARENT
                     );
 
+                    currentStage = "切换回源文档";
                     app.activeDocument = doc;
+                    currentStage = "复制选区图层到临时文档";
                     var exportLayer = selectionLayer.duplicate(
                         tempDocument,
                         ElementPlacement.PLACEATBEGINNING
                     );
+                    currentStage = "切换到剪贴板临时文档";
                     app.activeDocument = tempDocument;
+                    currentStage = "激活临时导出图层";
                     tempDocument.activeLayer = exportLayer;
+                    currentStage = "定位临时导出图层";
                     var exportLayerBounds = exportLayer.bounds;
                     exportLayer.translate(
                         UnitValue(
@@ -2136,6 +2189,7 @@ try {
                     outputHeight = selectionHeight;
                     var longestEdge = Math.max(selectionWidth, selectionHeight);
                     if (longestEdge > clipboardMaxEdge) {
+                        currentStage = "优化临时导出尺寸";
                         executeAction(
                             stringIDToTypeID("newPlacedLayer"),
                             undefined,
@@ -2154,6 +2208,7 @@ try {
                         optimized = true;
                     }
 
+                    currentStage = "导出临时 PNG";
                     exportFile = new File(tempFilePath);
                     if (exportFile.exists) {
                         exportFile.remove();
@@ -2165,9 +2220,12 @@ try {
                         throw new Error("临时 PNG 导出失败");
                     }
 
+                    currentStage = "关闭剪贴板临时文档";
                     tempDocument.close(SaveOptions.DONOTSAVECHANGES);
                     tempDocument = null;
+                    currentStage = "切换回源文档";
                     app.activeDocument = doc;
+                    currentStage = "重新激活选区拷贝图层";
                     doc.activeLayer = selectionLayer;
 
                     return stringifyResponse({
@@ -2203,7 +2261,7 @@ try {
 
                     return stringifyResponse({
                         success: false,
-                        error: "拷贝当前选区失败：" + error.message
+                        error: "拷贝当前选区失败（阶段：" + currentStage + "）：" + error.message
                     });
                 }
             })();

@@ -43,7 +43,7 @@ assert(
     'manifest bundle id must use the Hbird Bridge identity'
 );
 assert(
-    manifest.includes('<Extension Id="com.hbird.bridge.ps.panel" Version="1.11.1"/>'),
+    manifest.includes('<Extension Id="com.hbird.bridge.ps.panel" Version="1.11.2"/>'),
     'manifest extension id and version must be current'
 );
 const maxSizeMatch = manifest.match(
@@ -112,9 +112,13 @@ assert(
     readme.includes('智能对象导入：替换当前图层并保持原位置，完成后自动栅格化目标图层'),
     'README must document smart import rasterization'
 );
-assert(readme.includes('当前稳定版本：`v1.11.1`'), 'README must identify the formal stable release');
+assert(readme.includes('当前稳定版本：`v1.11.2`'), 'README must identify the current stable version');
 assert(!readme.includes('当前预发布标识'), 'README must not retain prerelease status after formal release');
-assert(changelog.includes('## v1.11.1 — 2026-08-04'), 'changelog must promote v1.11.1 to a formal release');
+assert(changelog.includes('## v1.11.2 — 2026-08-06'), 'changelog must identify the v1.11.2 fix release');
+assert(
+    changelog.includes('隐藏当前图层并保留有效选区的 Photoshop 实机工作流验证通过'),
+    'changelog must record the verified hidden-layer copy-selection workflow'
+);
 assert(!changelog.includes('等待 Photoshop 实机工作流验证'), 'formal release notes must not claim prerelease status');
 assert(
     packageScript.includes("'CSXS\\manifest.xml'") &&
@@ -124,6 +128,7 @@ assert(
         packageScript.includes("'一键安装.bat'"),
     'release packaging must use an explicit runtime allowlist'
 );
+assert(packageScript.includes("[string]$Version = '1.11.2'"), 'release packaging must default to v1.11.2');
 assert(packageScript.includes('Get-FileHash') && packageScript.includes('.sha256'), 'release packaging must emit a checksum');
 assert(releaseWorkflow.includes("tags:\n      - 'v*'") && releaseWorkflow.includes("!contains(github.ref_name, '-')"),
     'release workflow must run only for formal version tags');

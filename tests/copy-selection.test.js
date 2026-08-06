@@ -15,7 +15,10 @@ const copyEnd = main.indexOf('function importToPS(mode)', copyStart);
 const clipboardHelpers = main.slice(clipboardHelpersStart, copyStart);
 const copyFunction = main.slice(copyStart, copyEnd);
 const createSelectionLayerPosition = copyFunction.indexOf('selectionLayer = doc.activeLayer');
-const removeTemporaryStampPosition = copyFunction.indexOf('stampLayer.remove()');
+const createMergeGuardPosition = copyFunction.indexOf('mergeGuardLayer = doc.artLayers.add()');
+const mergeVisiblePosition = copyFunction.indexOf('executeAction(charIDToTypeID("MrgV"), mergeDescriptor, DialogModes.NO)');
+const removeMergeGuardPosition = copyFunction.indexOf('deleteLayerWithoutSelecting(mergeGuardLayerId)');
+const removeTemporaryStampPosition = copyFunction.indexOf('deleteLayerWithoutSelecting(stampLayerId)');
 const createExportDocumentPosition = copyFunction.indexOf('tempDocument = app.documents.add(');
 const saveClipboardPngPosition = copyFunction.indexOf('tempDocument.saveAs(exportFile, pngOptions, true, Extension.LOWERCASE)');
 
@@ -42,6 +45,57 @@ const checks = [
     [copyFunction.includes('doc.selection.bounds'), 'action must verify an active selection'],
     [copyFunction.includes('mergeDescriptor.putBoolean(charIDToTypeID("Dplc"), true)'), 'merge-visible must duplicate into a temporary stamp'],
     [copyFunction.includes('executeAction(charIDToTypeID("MrgV"), mergeDescriptor, DialogModes.NO)'), 'action must stamp visible layers'],
+    [copyFunction.includes('var mergeGuardLayer = null'), 'copying must track the temporary visible merge guard'],
+    [copyFunction.includes('var mergeGuardLayerId = null'), 'copying must track the merge guard by Photoshop layer id'],
+    [copyFunction.includes('var stampLayerId = null'), 'copying must track the temporary stamp by Photoshop layer id'],
+    [copyFunction.includes('function layerExistsById(layerId)'), 'temporary cleanup must tolerate layers consumed by Photoshop'],
+    [
+        copyFunction.includes('executeActionGet(layerReference)') &&
+            copyFunction.includes('catch(layerLookupError)') &&
+            copyFunction.includes('return false;'),
+        'layer existence checks must use a direct id lookup and treat missing layers as already cleaned'
+    ],
+    [copyFunction.includes('function deleteLayerWithoutSelecting(layerId)'), 'temporary layers need a no-selection delete helper'],
+    [
+        copyFunction.includes('deleteReference.putIdentifier(charIDToTypeID("Lyr "), layerId)') &&
+            copyFunction.includes('executeAction(charIDToTypeID("Dlt "), deleteDescriptor, DialogModes.NO)'),
+        'temporary deletion must target the layer id directly through Action Manager'
+    ],
+    [copyFunction.includes('var currentStage = "初始化"'), 'Photoshop failures must track the current execution stage'],
+    [createMergeGuardPosition >= 0, 'copying must create a temporary empty layer before stamping visible content'],
+    [copyFunction.includes('mergeGuardLayer.visible = true'), 'the temporary merge guard must be visible'],
+    [copyFunction.includes('mergeGuardLayerId = mergeGuardLayer.id'), 'the merge guard id must be captured before merge-visible'],
+    [copyFunction.includes('stampLayerId = stampLayer.id'), 'the stamp id must be captured before creating the selection layer'],
+    [
+        createMergeGuardPosition < mergeVisiblePosition,
+        'Photoshop must create and auto-activate the visible merge guard before merge-visible'
+    ],
+    [
+        !copyFunction.includes('doc.activeLayer = mergeGuardLayer'),
+        'the newly created merge guard must not be selected again when the previous layer is hidden'
+    ],
+    [
+        mergeVisiblePosition < removeMergeGuardPosition && removeMergeGuardPosition < createSelectionLayerPosition,
+        'only the temporary merge guard must be removed after the stamp is created'
+    ],
+    [!copyFunction.includes('doc.activeLayer.visible = true'), 'copying must not reveal the user selected layer'],
+    [!copyFunction.includes('mergeGuardLayer.remove()'), 'merge guard deletion must not invoke Photoshop DOM selection'],
+    [!copyFunction.includes('stampLayer.remove()'), 'stamp deletion must not invoke Photoshop DOM selection'],
+    [
+        copyFunction.includes('if (layerExistsById(mergeGuardLayerId))') &&
+            copyFunction.includes('if (layerExistsById(stampLayerId))'),
+        'temporary layers must only be deleted when Photoshop still reports their ids'
+    ],
+    [
+        copyFunction.includes('currentStage = "删除临时合并辅助图层"') &&
+            copyFunction.includes('currentStage = "删除临时盖印图层"') &&
+            copyFunction.includes('currentStage = "重新激活选区拷贝图层"'),
+        'all remaining layer-selection boundaries must identify their diagnostic stage'
+    ],
+    [
+        copyFunction.includes('error: "拷贝当前选区失败（阶段：" + currentStage + "）：" + error.message'),
+        'Photoshop errors must report the exact execution stage'
+    ],
     [!copyFunction.includes('mergeVisibleLayers()'), 'action must not destructively merge the document'],
     [copyFunction.includes('stringIDToTypeID("copyToLayer")'), 'selection must be copied into a new layer'],
     [copyFunction.includes('selectionLayer.name = "选区拷贝"'), 'new layer must have a recognizable name'],
@@ -84,7 +138,7 @@ const checks = [
     [clipboardHelpers.includes('Clipboard]::ContainsImage()'), 'the helper must verify a pasted image is available'],
     [clipboardHelpers.includes('windowsHide: true'), 'the PowerShell helper must not flash a console window'],
     [main.includes('fs.unlink(imagePath'), 'temporary PNG must be deleted after the clipboard attempt'],
-    [copyFunction.includes('stampLayer.remove()'), 'temporary stamp layer must be deleted after success'],
+    [copyFunction.includes('deleteLayerWithoutSelecting(stampLayerId)'), 'temporary stamp layer must be deleted without selecting it'],
     [copyFunction.includes('doc.activeLayer = selectionLayer'), 'new selection layer must remain active'],
     [copyFunction.includes('doc.activeHistoryState = originalHistoryState'), 'failures must roll back document changes'],
     [copyFunction.includes('当前没有有效的框选选区'), 'missing selections must return a clear message'],
